@@ -13,7 +13,7 @@
       ],
       "settings": {
         "rust-analyzer.check.command": "clippy",
-        "rust-analyzer.rustfmt.extraArgs": ["--edition", "2021"]
+        "rust-analyzer.rustfmt.extraArgs": ["--edition", "2024"]
       }
     }
   },
