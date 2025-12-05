@@ -120,7 +120,7 @@ struct ContentView: View {
                 }
             }
         } detail: {
-            MapView { x, y in
+            MapView(selectedCoordinate: store.selection?.coordinate) { x, y in
                 pendingInitialX = x
                 pendingInitialY = y
                 isPresentingAdd = true
@@ -128,7 +128,6 @@ struct ContentView: View {
         }
     }
 }
-
 
 struct AddSensorView: View {
     @Environment(\.dismiss) private var dismiss
@@ -151,8 +150,10 @@ struct AddSensorView: View {
          confirmLabel: String = "Save",
          onSave: @escaping (Double, Double) -> Void)
     {
-        _xText = State(initialValue: initialX.map{ xv in String(format: "%.5f", xv) } ?? "")
-        _yText = State(initialValue: initialY.map{ yv in String(format: "%.5f", yv) } ?? "")
+        let defaultPointFormat = "%.5f"
+
+        _xText = State(initialValue: initialX.map{ String(format: defaultPointFormat, $0) } ?? "")
+        _yText = State(initialValue: initialY.map{ String(format: defaultPointFormat, $0) } ?? "")
         self.viewTitle = title
         self.confirmTitle = confirmLabel
         self.onSave = onSave
@@ -193,6 +194,7 @@ struct AddSensorView: View {
 
 
 struct MapView: UIViewRepresentable {
+    var selectedCoordinate: Coordinate? = nil
     var onLongPress: ((Double, Double) -> Void)? = nil
 
     func makeUIView(context: Context) -> MKMapView {
@@ -213,7 +215,16 @@ struct MapView: UIViewRepresentable {
         return mapView
     }
     
-    func updateUIView(_ uiView: MKMapView, context: Context) {}
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        // Center the map on the selected coordinate if provided
+        if let sel = selectedCoordinate {
+            let center = CLLocationCoordinate2D(latitude: sel.y, longitude: sel.x)
+            // Use a reasonable default span for zooming
+            let span = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+            let region = MKCoordinateRegion(center: center, span: span)
+            uiView.setRegion(region, animated: true)
+        }
+    }
     
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -234,9 +245,11 @@ struct MapView: UIViewRepresentable {
         }
 
         @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-            guard gesture.state == .began, let view = gesture.view as? MKMapView else { return }
-            let point = gesture.location(in: view)
-            parent.onLongPress?(point.x, point.y)
+            guard gesture.state == .began, let mapView = gesture.view as? MKMapView else { return }
+            let point = gesture.location(in: mapView)
+            let coord = mapView.convert(point, toCoordinateFrom: mapView)
+            // Pass back as (x: longitude, y: latitude)
+            parent.onLongPress?(coord.longitude, coord.latitude)
         }
     }
 }
