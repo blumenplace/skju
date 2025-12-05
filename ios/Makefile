@@ -1,6 +1,6 @@
 APP_NAME=SkjuIOS
 BUNDLE_ID=place.blumen.skju
-SIMULATOR_NAME="iPhone 16e"
+SIMULATOR_NAME="iPad"
 ARCH=$(shell uname -m)
 
 # 1. Try to find SDK in current environment
@@ -36,6 +36,11 @@ build:
 	@echo '    <key>CFBundleShortVersionString</key><string>1.0</string>' >> $(APP_NAME).app/Info.plist
 	@echo '    <key>CFBundleVersion</key><string>1</string>' >> $(APP_NAME).app/Info.plist
 	@echo '    <key>LSRequiresIPhoneOS</key><true/>' >> $(APP_NAME).app/Info.plist
+	@echo '    <key>UIDeviceFamily</key>' >> $(APP_NAME).app/Info.plist
+	@echo '    <array>' >> $(APP_NAME).app/Info.plist
+    #@echo '        <integer>1</integer>' >> $(APP_NAME).app/Info.plist
+	@echo '        <integer>2</integer>' >> $(APP_NAME).app/Info.plist
+	@echo '    </array>' >> $(APP_NAME).app/Info.plist
 	@echo '    <key>UILaunchScreen</key><dict/>' >> $(APP_NAME).app/Info.plist
 	@echo '</dict></plist>' >> $(APP_NAME).app/Info.plist
 
