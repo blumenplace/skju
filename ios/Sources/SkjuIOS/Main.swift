@@ -53,6 +53,14 @@ final class SensorsStore: ObservableObject {
             selection = updated
         }
     }
+
+    // Deletes the specified sensor item
+    func delete(item: SensorItem) {
+        items.removeAll { $0.id == item.id }
+        if selection?.id == item.id {
+            selection = nil
+        }
+    }
 }
 
 
@@ -70,13 +78,18 @@ struct ContentView: View {
             List(store.items, selection: $store.selection) { item in
                 Text(item.title)
                     .swipeActions {
+                        Button(role: .destructive) {
+                            store.delete(item: item)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                         Button("Edit") {
                             itemBeingEdited = item
                         }
                         .tint(.blue)
                     }
             }
-            .navigationTitle("Items")
+            .navigationTitle("Sensors")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
