@@ -77,6 +77,10 @@ struct ContentView: View {
         NavigationSplitView {
             List(store.items, selection: $store.selection) { item in
                 Text(item.title)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        store.selection = item
+                    }
                     .swipeActions {
                         Button(role: .destructive) {
                             store.delete(item: item)
