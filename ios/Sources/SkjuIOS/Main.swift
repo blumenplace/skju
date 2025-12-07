@@ -138,11 +138,18 @@ struct ContentView: View {
                 }
             }
         } detail: {
-            MapView(selectedCoordinate: store.selection?.coordinate) { x, y in
-                pendingInitialX = x
-                pendingInitialY = y
-                isPresentingAdd = true
-            }.ignoresSafeArea()
+            MapView(
+                selectedCoordinate: store.selection?.coordinate,
+                onAddAt: { x, y in
+                    pendingInitialX = x
+                    pendingInitialY = y
+                    isPresentingAdd = true
+                },
+                onQuakeAt: { x, y in
+                    // TODO: launch the eather quake simulation
+                }
+            )
+            .ignoresSafeArea()
         }
     }
 }
@@ -213,7 +220,8 @@ struct AddSensorView: View {
 
 struct MapView: UIViewRepresentable {
     var selectedCoordinate: Coordinate? = nil
-    var onLongPress: ((Double, Double) -> Void)? = nil
+    var onAddAt: ((Double, Double) -> Void)? = nil
+    var onQuakeAt: ((Double, Double) -> Void)? = nil
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -225,10 +233,9 @@ struct MapView: UIViewRepresentable {
         mapView.addOverlay(overlay, level: .aboveLabels)
         mapView.delegate = context.coordinator
         
-        // Add long press gesture recognizer
-        let longPress = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(_:)))
-        longPress.minimumPressDuration = 0.5
-        mapView.addGestureRecognizer(longPress)
+        // Add context menu interaction to show a popup near the press location
+        let interaction = UIContextMenuInteraction(delegate: context.coordinator)
+        mapView.addInteraction(interaction)
         
         return mapView
     }
@@ -248,7 +255,7 @@ struct MapView: UIViewRepresentable {
         Coordinator(self)
     }
     
-    class Coordinator: NSObject, MKMapViewDelegate {
+    class Coordinator: NSObject, MKMapViewDelegate, UIContextMenuInteractionDelegate {
         var parent: MapView
         
         init(_ parent: MapView) {
@@ -262,12 +269,21 @@ struct MapView: UIViewRepresentable {
             return MKOverlayRenderer(overlay: overlay)
         }
 
-        @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-            guard gesture.state == .began, let mapView = gesture.view as? MKMapView else { return }
-            let point = gesture.location(in: mapView)
-            let coord = mapView.convert(point, toCoordinateFrom: mapView)
-            // Pass back as (x: longitude, y: latitude)
-            parent.onLongPress?(coord.longitude, coord.latitude)
+        // UIContextMenuInteractionDelegate
+        func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
+            guard let mapView = interaction.view as? MKMapView else { return nil }
+            let coord = mapView.convert(location, toCoordinateFrom: mapView)
+            let x = coord.longitude
+            let y = coord.latitude
+            return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
+                let add = UIAction(title: "Add Sensor", image: UIImage(systemName: "plus")) { [weak self] _ in
+                    self?.parent.onAddAt?(x, y)
+                }
+                let quake = UIAction(title: "Quake", image: UIImage(systemName: "waveform.path.ecg")) { [weak self] _ in
+                    self?.parent.onQuakeAt?(x, y)
+                }
+                return UIMenu(title: "Map", children: [add, quake])
+            }
         }
     }
 }
