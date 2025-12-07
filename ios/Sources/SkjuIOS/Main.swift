@@ -77,6 +77,7 @@ struct ContentView: View {
         NavigationSplitView {
             List(store.items, selection: $store.selection) { item in
                 Text(item.title)
+                    .tag(item)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         store.selection = item
