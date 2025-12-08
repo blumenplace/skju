@@ -42,12 +42,14 @@ build:
 	@echo '        <integer>2</integer>' >> $(APP_NAME).app/Info.plist
 	@echo '    </array>' >> $(APP_NAME).app/Info.plist
 	@echo '    <key>UILaunchScreen</key><dict/>' >> $(APP_NAME).app/Info.plist
+	@echo '    <key>LSMinimumSystemVersion</key>' >> $(APP_NAME).app/Info.plist
+	@echo '    <string>17.0</string>' >> $(APP_NAME).app/Info.plist
 	@echo '</dict></plist>' >> $(APP_NAME).app/Info.plist
 
 	# Compile with -parse-as-library
 	# Compile using xcrun to ensure SDKROOT is set correctly for clang/linker
 	xcrun -sdk iphonesimulator swiftc Sources/SkjuIOS/Main.swift \
-		-target $(ARCH)-apple-ios16.0-simulator \
+		-target $(ARCH)-apple-ios17.0-simulator \
 		-parse-as-library \
 		-o $(APP_NAME).app/$(APP_NAME)
 

@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 import UIKit
+import SwiftData
 
 
 @main
@@ -9,6 +10,7 @@ struct OpenStreetMapApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(for: SensorItem.self)
     }
 }
 
@@ -19,53 +21,30 @@ struct Coordinate: Hashable {
 }
 
 
-struct SensorItem: Identifiable, Hashable {
-    let id: UUID
-    let coordinate: Coordinate
+@Model final class SensorItem: Identifiable, Hashable {
+    var id: UUID
+    var x: Double
+    var y: Double
 
-    init(id: UUID = UUID(), coordinate: Coordinate) {
+    init(id: UUID = UUID(), x: Double, y: Double) {
         self.id = id
-        self.coordinate = coordinate
+        self.x = x
+        self.y = y
     }
 
-    var title: String { "x: \(coordinate.x), y: \(coordinate.y)" }
-}
+    var coordinate: Coordinate { Coordinate(x: x, y: y) }
+    var title: String { "x: \(x), y: \(y)" }
 
-
-final class SensorsStore: ObservableObject {
-    @Published var items: [SensorItem] = []
-    @Published var selection: SensorItem? = nil
-
-    // Adds a new sensor with the provided coordinates
-    func add(x: Double, y: Double) {
-        let coord = Coordinate(x: x, y: y)
-        let new = SensorItem(coordinate: coord)
-        items.append(new)
-        selection = new
-    }
-
-    // Updates coordinates of an existing sensor item
-    func update(item: SensorItem, x: Double, y: Double) {
-        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
-        let updated = SensorItem(id: item.id, coordinate: Coordinate(x: x, y: y))
-        items[index] = updated
-        if selection?.id == item.id {
-            selection = updated
-        }
-    }
-
-    // Deletes the specified sensor item
-    func delete(item: SensorItem) {
-        items.removeAll { $0.id == item.id }
-        if selection?.id == item.id {
-            selection = nil
-        }
-    }
+    static func == (lhs: SensorItem, rhs: SensorItem) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 
 struct ContentView: View {
-    @StateObject private var store = SensorsStore()
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: [SortDescriptor(\SensorItem.x), SortDescriptor(\SensorItem.y)]) private var items: [SensorItem]
+
+    @State private var selection: SensorItem? = nil
 
     @State private var isPresentingAdd = false
     @State private var itemBeingEdited: SensorItem? = nil
@@ -75,16 +54,16 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(store.items, selection: $store.selection) { item in
+            List(items, selection: $selection) { item in
                 Text(item.title)
                     .tag(item)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        store.selection = item
+                        selection = item
                     }
                     .swipeActions {
                         Button(role: .destructive) {
-                            store.delete(item: item)
+                            modelContext.delete(item)
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -106,13 +85,13 @@ struct ContentView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        if let selected = store.selection {
+                        if let selected = selection {
                             itemBeingEdited = selected
                         }
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
-                    .disabled(store.selection == nil)
+                    .disabled(selection == nil)
                     .accessibilityLabel("Edit selected sensor")
                 }
             }
@@ -124,7 +103,9 @@ struct ContentView: View {
                     initialX: pendingInitialX,
                     initialY: pendingInitialY
                 ) { x, y in
-                    store.add(x: x, y: y)
+                    let new = SensorItem(x: x, y: y)
+                    modelContext.insert(new)
+                    selection = new
                 }
             }
             .sheet(item: $itemBeingEdited) { item in
@@ -134,13 +115,14 @@ struct ContentView: View {
                     title: "Edit Sensor",
                     confirmLabel: "Update"
                 ) { x, y in
-                    store.update(item: item, x: x, y: y)
+                    item.x = x
+                    item.y = y
                 }
             }
         } detail: {
             MapView(
-                sensors: store.items,
-                selectedCoordinate: store.selection?.coordinate,
+                sensors: items,
+                selectedCoordinate: selection?.coordinate,
                 onAddAt: { x, y in
                     pendingInitialX = x
                     pendingInitialY = y
