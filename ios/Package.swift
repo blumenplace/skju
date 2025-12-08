@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "SkjuIOS",
     platforms: [
-        .iOS(.v16)
+        .iOS(.v17)
     ],
     products: [
         .library(name: "SkjuIOS", targets: ["SkjuIOS"]),
