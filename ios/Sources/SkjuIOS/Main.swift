@@ -139,6 +139,7 @@ struct ContentView: View {
             }
         } detail: {
             MapView(
+                sensors: store.items,
                 selectedCoordinate: store.selection?.coordinate,
                 onAddAt: { x, y in
                     pendingInitialX = x
@@ -190,7 +191,7 @@ struct AddSensorView: View {
                 Section(header: Text("Coordinates")) {
                     TextField("X", text: $xText)
                         .keyboardType(.numbersAndPunctuation)
-                        .textContentType(.oneTimeCode) // prevents iOS from offering contact info
+                        .textContentType(.oneTimeCode)
                         .accessibilityLabel("X coordinate")
                     TextField("Y", text: $yText)
                         .keyboardType(.numbersAndPunctuation)
@@ -219,6 +220,7 @@ struct AddSensorView: View {
 
 
 struct MapView: UIViewRepresentable {
+    var sensors: [SensorItem] = []
     var selectedCoordinate: Coordinate? = nil
     var onAddAt: ((Double, Double) -> Void)? = nil
     var onQuakeAt: ((Double, Double) -> Void)? = nil
@@ -241,16 +243,25 @@ struct MapView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: MKMapView, context: Context) {
-        // Center the map on the selected coordinate if provided
         if let sel = selectedCoordinate {
             let center = CLLocationCoordinate2D(latitude: sel.y, longitude: sel.x)
-            // Use a reasonable default span for zooming
-            let span = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+
+            let span = MKCoordinateSpan(latitudeDelta: 1.0, longitudeDelta: 1.0)
             let region = MKCoordinateRegion(center: center, span: span)
             uiView.setRegion(region, animated: true)
         }
+
+        let existing = uiView.annotations
+        uiView.removeAnnotations(existing)
+
+        for sensor in sensors {
+            let ann = MKPointAnnotation()
+            ann.coordinate = CLLocationCoordinate2D(latitude: sensor.coordinate.y, longitude: sensor.coordinate.x)
+            ann.title = "Sensor"
+            uiView.addAnnotation(ann)
+        }
     }
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
@@ -267,6 +278,23 @@ struct MapView: UIViewRepresentable {
                 return MKTileOverlayRenderer(tileOverlay: tileOverlay)
             }
             return MKOverlayRenderer(overlay: overlay)
+        }
+
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            // Customize only for our point annotations
+            guard annotation is MKPointAnnotation else { return nil }
+            let identifier = "sensor-annotation"
+            let view: MKMarkerAnnotationView
+            if let dequeued = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView {
+                view = dequeued
+                view.annotation = annotation
+            } else {
+                view = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                view.canShowCallout = true
+                view.glyphImage = UIImage(systemName: "flag.fill")
+                view.markerTintColor = .systemRed
+            }
+            return view
         }
 
         // UIContextMenuInteractionDelegate
