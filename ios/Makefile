@@ -43,13 +43,13 @@ build:
 	@echo '    </array>' >> $(APP_NAME).app/Info.plist
 	@echo '    <key>UILaunchScreen</key><dict/>' >> $(APP_NAME).app/Info.plist
 	@echo '    <key>LSMinimumSystemVersion</key>' >> $(APP_NAME).app/Info.plist
-	@echo '    <string>17.0</string>' >> $(APP_NAME).app/Info.plist
+	@echo '    <string>18.0</string>' >> $(APP_NAME).app/Info.plist
 	@echo '</dict></plist>' >> $(APP_NAME).app/Info.plist
 
 	# Compile with -parse-as-library
 	# Compile using xcrun to ensure SDKROOT is set correctly for clang/linker
 	xcrun -sdk iphonesimulator swiftc Sources/SkjuIOS/Main.swift \
-		-target $(ARCH)-apple-ios17.0-simulator \
+		-target $(ARCH)-apple-ios18.0-simulator \
 		-parse-as-library \
 		-o $(APP_NAME).app/$(APP_NAME)
 
@@ -65,7 +65,11 @@ launch:
 	@echo "Launching App..."
 	xcrun simctl launch $(SIMULATOR_NAME) $(BUNDLE_ID)
 
-run: build boot install launch
+fmt:
+	xcrun swift-format --in-place ./Sources/SkjuIOS/Main.swift
+
+run: fmt build boot install launch
+
 
 clean:
 	rm -rf $(APP_NAME).app
