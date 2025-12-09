@@ -15,7 +15,5 @@ pub fn create_routes() -> Router<AppState> {
 
 async fn fallback(uri: Uri) -> impl IntoResponse {
     let body = json!({ "message": format!("Route for {uri} not found")});
-    let response = (StatusCode::NOT_FOUND, Json(body));
-
-    response
+    (StatusCode::NOT_FOUND, Json(body))
 }

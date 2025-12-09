@@ -19,3 +19,11 @@ pub async fn set_sensors(
 
     Ok(response)
 }
+
+pub async fn get_sensors(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    let sensors = service::get_sensors(&state).await?;
+    let body = json!({ "sensors": sensors });
+    let response = (StatusCode::OK, Json(body));
+
+    Ok(response)
+}
