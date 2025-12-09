@@ -2,18 +2,16 @@ import Foundation
 import OSLog
 import SwiftData
 
-public struct SensorStoreConfiguration: DataStoreConfiguration, Hashable, Sendable {
-  public var name: String { self.id }
-  public var schema: Schema? { nil }
+public struct SensorsStoreConfiguration: DataStoreConfiguration, Hashable, Sendable {
+  public typealias Store = SensorsRemoteStore
 
-  public typealias Store = SensorRemoteStore
-
-  public var id: String { identifier }
-  public let identifier: String
+  public var schema: Schema?
+  public var name: String
   public let baseURL: URL
 
-  public init(identifier: String = "SensorRemoteStore", baseURL: URL = URL(string: "https://skju-sim.blumen.place")!) {
-    self.identifier = identifier
+  public init(name: String = "SensorsRemoteStore", schema: Schema, baseURL: URL = URL(string: "https://skju-sim.blumen.place")!) {
+    self.name = name
+    self.schema = schema
     self.baseURL = baseURL
   }
 }
@@ -31,7 +29,7 @@ public struct SensorSnapshot: DataStoreSnapshot {
     self.y = y
   }
 
-  public init(from backing: any BackingData, relatedBackingDatas: inout [PersistentIdentifier : any BackingData]) {
+  public init(from backing: any BackingData, relatedBackingDatas: inout [PersistentIdentifier: any BackingData]) {
     let pid = backing.persistentModelID!
     let id: UUID = backing.getValue(forKey: \SensorItem.id)
     let x: Double = backing.getValue(forKey: \SensorItem.x)
@@ -44,8 +42,8 @@ public struct SensorSnapshot: DataStoreSnapshot {
   }
 }
 
-public final class SensorRemoteStore: DataStore {
-  public typealias Configuration = SensorStoreConfiguration
+public final class SensorsRemoteStore: DataStore {
+  public typealias Configuration = SensorsStoreConfiguration
   public typealias Snapshot = SensorSnapshot
 
   public let identifier: String
