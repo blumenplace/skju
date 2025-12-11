@@ -1,29 +1,86 @@
-use super::service;
+use crate::domain::sensor::{SensorCreateRequest, SensorUpdateRequest};
 use crate::{error::ApiError, state::AppState};
+use axum::extract::Path;
 use axum::{
     extract::{Json, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use serde_json::json;
-use skju_core::SensorConfig;
 
-pub async fn set_sensors(
+pub async fn create_sensor(
     State(state): State<AppState>,
-    Json(sensors): Json<Vec<SensorConfig>>,
+    Json(sensor): Json<SensorCreateRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    service::save_sensors(&state, sensors).await?;
-
-    let body = json!({ "success": true, "message": "Sensors were successfully saved" });
-    let response = (StatusCode::CREATED, Json(body));
+    let sensor = state
+        .sensor_service
+        .create(sensor)
+        .await
+        .map_err(|_| ApiError::Internal)?;
+    let response = (StatusCode::CREATED, Json(sensor));
 
     Ok(response)
 }
 
-pub async fn get_sensors(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
-    let sensors = service::get_sensors(&state).await?;
-    let body = json!({ "sensors": sensors });
-    let response = (StatusCode::OK, Json(body));
+pub async fn update_sensor(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    Json(sensor): Json<SensorUpdateRequest>,
+) -> Result<impl IntoResponse, ApiError> {
+    let sensor = state
+        .sensor_service
+        .update(id, sensor)
+        .await
+        .map_err(|_| ApiError::Internal)?;
+    let response = (StatusCode::OK, Json(sensor));
+
+    Ok(response)
+}
+
+pub async fn delete_sensor(State(state): State<AppState>, Path(id): Path<i32>) -> Result<impl IntoResponse, ApiError> {
+    state
+        .sensor_service
+        .delete(id)
+        .await
+        .map_err(|_| ApiError::Internal)?;
+
+    let response = (StatusCode::NO_CONTENT, ());
+
+    Ok(response)
+}
+
+pub async fn get_all_sensors(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    let sensors = state
+        .sensor_service
+        .list()
+        .await
+        .map_err(|_| ApiError::Internal)?;
+    let response = (StatusCode::OK, Json(sensors));
+
+    Ok(response)
+}
+
+pub async fn get_sensor_by_id(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<impl IntoResponse, ApiError> {
+    let sensor = state
+        .sensor_service
+        .get_by_id(id)
+        .await
+        .map_err(|_| ApiError::Internal)?;
+    let response = (StatusCode::OK, Json(sensor));
+
+    Ok(response)
+}
+
+pub async fn delete_all_sensors(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    state
+        .sensor_service
+        .delete_all()
+        .await
+        .map_err(|_| ApiError::Internal)?;
+
+    let response = (StatusCode::NO_CONTENT, ());
 
     Ok(response)
 }

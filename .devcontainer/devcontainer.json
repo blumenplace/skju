@@ -1,9 +1,10 @@
 {
   "name": "SKJU Dev Container",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
-  },
+  "service": "dev",
+  "dockerComposeFile": [
+    "../docker-compose.yml"
+  ],
+  "overrideCommand": false,
   "customizations": {
     "vscode": {
       "extensions": [
@@ -13,12 +14,17 @@
       ],
       "settings": {
         "rust-analyzer.check.command": "clippy",
-        "rust-analyzer.rustfmt.extraArgs": ["--edition", "2024"]
+        "rust-analyzer.rustfmt.extraArgs": [
+          "--edition",
+          "2024"
+        ]
       }
     }
   },
   "remoteUser": "ubuntu",
   "postCreateCommand": "cargo build",
-  "forwardPorts": [8080],
+  "forwardPorts": [
+    8080
+  ],
   "workspaceFolder": "/workspaces/skju"
 }

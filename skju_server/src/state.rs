@@ -1,10 +1,13 @@
-#[derive(Debug, Clone)]
+use crate::application::sensors::SensorService;
+use std::sync::Arc;
+
+#[derive(Clone)]
 pub struct AppState {
-    pub data_dir: String,
+    pub sensor_service: Arc<dyn SensorService>,
 }
 
 impl AppState {
-    pub fn new() -> Self {
-        Self { data_dir: String::from("data") }
+    pub fn new(sensor_service: Arc<dyn SensorService>) -> Self {
+        Self { sensor_service }
     }
 }
