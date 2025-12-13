@@ -12,6 +12,7 @@ pub async fn create_sensor(
     Json(sensor): Json<SensorCreateRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let sensor = state
+        .app_services
         .sensor_service
         .create(sensor)
         .await
@@ -27,6 +28,7 @@ pub async fn update_sensor(
     Json(sensor): Json<SensorUpdateRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let sensor = state
+        .app_services
         .sensor_service
         .update(id, sensor)
         .await
@@ -38,6 +40,7 @@ pub async fn update_sensor(
 
 pub async fn delete_sensor(State(state): State<AppState>, Path(id): Path<i32>) -> Result<impl IntoResponse, ApiError> {
     state
+        .app_services
         .sensor_service
         .delete(id)
         .await
@@ -50,6 +53,7 @@ pub async fn delete_sensor(State(state): State<AppState>, Path(id): Path<i32>) -
 
 pub async fn get_all_sensors(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
     let sensors = state
+        .app_services
         .sensor_service
         .list()
         .await
@@ -64,6 +68,7 @@ pub async fn get_sensor_by_id(
     Path(id): Path<i32>,
 ) -> Result<impl IntoResponse, ApiError> {
     let sensor = state
+        .app_services
         .sensor_service
         .get_by_id(id)
         .await
@@ -75,6 +80,7 @@ pub async fn get_sensor_by_id(
 
 pub async fn delete_all_sensors(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
     state
+        .app_services
         .sensor_service
         .delete_all()
         .await

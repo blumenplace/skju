@@ -10,16 +10,10 @@ mod routes;
 mod state;
 
 use crate::app::create_app;
-use crate::application::sensors;
 use crate::config::Config;
-use crate::infrastructure::pg_sensor_repository::PgSensorRepository;
-use crate::state::AppState;
-
-use axum::Router;
 use dotenvy::dotenv;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
-use std::sync::Arc;
 use tokio::net::TcpListener;
 
 #[tokio::main]
@@ -32,7 +26,7 @@ async fn main() {
     run_db_migrations(&pool).await;
 
     let listener = get_tcp_listener(&config).await;
-    let app = get_app(pool);
+    let app = create_app(pool);
 
     axum::serve(listener, app)
         .await
@@ -52,16 +46,6 @@ async fn run_db_migrations(pool: &Pool<Postgres>) {
         .run(pool)
         .await
         .expect("Failed to run database migrations");
-}
-
-fn get_app(db_pool: Pool<Postgres>) -> Router<()> {
-    let sensor_repository = PgSensorRepository::new(db_pool.clone());
-    let sensor_service = sensors::Service::new(Arc::new(sensor_repository));
-
-    let app_state = AppState::new(Arc::new(sensor_service));
-    let app = create_app().with_state(app_state);
-
-    app
 }
 
 async fn get_tcp_listener(config: &Config) -> TcpListener {

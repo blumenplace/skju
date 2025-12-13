@@ -1,5 +1,7 @@
+use crate::application::messages::AppMessage;
 use crate::application::sensors::service::SensorService;
 use crate::domain::sensor::{Sensor, SensorCreateRequest, SensorError, SensorUpdateRequest};
+use crate::ports::bus_service::BusService;
 use crate::ports::sensors_repository::SensorRepository;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -7,11 +9,12 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct Service {
     repository: Arc<dyn SensorRepository>,
+    bus_service: Arc<dyn BusService<AppMessage>>,
 }
 
 impl Service {
-    pub fn new(repository: Arc<dyn SensorRepository>) -> Self {
-        Self { repository }
+    pub fn new(repository: Arc<dyn SensorRepository>, bus_service: Arc<dyn BusService<AppMessage>>) -> Self {
+        Self { repository, bus_service }
     }
 }
 

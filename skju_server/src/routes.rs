@@ -1,4 +1,4 @@
-use crate::features::sensors;
+use crate::features::{readings, sensors};
 use crate::state::AppState;
 use axum::http::{StatusCode, Uri};
 use axum::response::IntoResponse;
@@ -9,6 +9,7 @@ use serde_json::json;
 pub fn create_routes() -> Router<AppState> {
     Router::new()
         .nest("/sensors", sensors::routes())
+        .nest("/readings", readings::routes())
         .fallback(get(fallback))
 }
 
