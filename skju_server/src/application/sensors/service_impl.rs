@@ -1,5 +1,5 @@
+use super::SensorService;
 use crate::application::messages::AppMessage;
-use crate::application::sensors::service::SensorService;
 use crate::domain::sensor::{Sensor, SensorCreateRequest, SensorError, SensorUpdateRequest};
 use crate::ports::bus_service::BusService;
 use crate::ports::sensors_repository::SensorRepository;

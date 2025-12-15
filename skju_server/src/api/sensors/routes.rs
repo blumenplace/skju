@@ -1,6 +1,4 @@
-use super::handlers::{
-    create_sensor, delete_all_sensors, delete_sensor, get_all_sensors, get_sensor_by_id, update_sensor,
-};
+use super::{create_sensor, delete_all_sensors, delete_sensor, get_all_sensors, get_sensor_by_id, update_sensor};
 use crate::state::AppState;
 use axum::Router;
 use axum::routing::get;

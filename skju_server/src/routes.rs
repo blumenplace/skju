@@ -1,4 +1,4 @@
-use crate::features::{readings, sensors};
+use crate::api::{readings, sensors};
 use crate::state::AppState;
 use axum::http::{StatusCode, Uri};
 use axum::response::IntoResponse;

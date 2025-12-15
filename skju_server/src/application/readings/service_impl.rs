@@ -1,5 +1,5 @@
+use super::ReadingService;
 use crate::application::messages::AppMessage;
-use crate::application::readings::service::ReadingService;
 use crate::domain::reading::{Reading, ReadingCreateRequest, ReadingError, ReadingGetBetweenRequest};
 use crate::ports::bus_service::{BusMessage, BusService};
 use crate::ports::reading_repository::ReadingRepository;

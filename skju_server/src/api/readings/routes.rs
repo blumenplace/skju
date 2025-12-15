@@ -1,4 +1,4 @@
-use crate::features::readings::handlers::{create_reading, get_readings_between};
+use super::{create_reading, get_readings_between};
 use crate::state::AppState;
 use axum::Router;
 use axum::routing::post;

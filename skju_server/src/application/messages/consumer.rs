@@ -1,4 +1,4 @@
-use crate::application::messages::AppMessage;
+use super::AppMessage;
 use crate::application::readings::ReadingsBuffer;
 use crate::ports::bus_service::BusMessage;
 use std::sync::Arc;
