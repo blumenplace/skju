@@ -9,4 +9,5 @@ pub trait SensorRepository: Send + Sync + 'static {
     async fn list(&self) -> Result<Vec<Sensor>, SensorError>;
     async fn get_by_id(&self, id: i32) -> Result<Option<Sensor>, SensorError>;
     async fn delete_all(&self) -> Result<(), SensorError>;
+    async fn check_if_exists(&self, id: i32) -> Result<(), SensorError>;
 }

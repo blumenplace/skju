@@ -20,8 +20,13 @@ impl AppConsumer {
 
     pub async fn run(mut self) {
         while let Some(message) = self.receiver.recv().await {
+            let message_str = message.to_string();
+
             if let Err(error) = self.dispatch(message).await {
-                eprintln!("Failed to dispatch message: {}", error);
+                eprintln!(
+                    "Failed to dispatch message.\n Message:  {}.\n Error: {}",
+                    message_str, error
+                );
             };
         }
     }

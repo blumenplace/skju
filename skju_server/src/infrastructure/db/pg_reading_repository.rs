@@ -14,6 +14,12 @@ impl PgReadingRepository {
     }
 }
 
+impl From<sqlx::Error> for ReadingError {
+    fn from(err: sqlx::Error) -> Self {
+        ReadingError::Database(err.to_string())
+    }
+}
+
 #[async_trait]
 impl ReadingRepository for PgReadingRepository {
     async fn create(&self, request: Vec<ReadingCreateRequest>) -> Result<(), ReadingError> {

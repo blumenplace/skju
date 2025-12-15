@@ -28,7 +28,7 @@ impl ReadingService for Service {
         self.bus_service
             .send(message)
             .await
-            .map_err(|_| ReadingError::InternalError)?;
+            .map_err(|_| ReadingError::Internal("Failed to publish reading".into()))?;
 
         Ok(())
     }

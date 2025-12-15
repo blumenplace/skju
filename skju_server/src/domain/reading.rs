@@ -27,25 +27,15 @@ pub struct ReadingGetBetweenRequest {
 
 #[derive(Debug)]
 pub enum ReadingError {
-    NotFound,
-    DatabaseError(String),
-    ValidationError(String),
-    InternalError,
+    Database(String),
+    Internal(String),
 }
 
 impl fmt::Display for ReadingError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ReadingError::NotFound => write!(formatter, "Sensor not found"),
-            ReadingError::DatabaseError(e) => write!(formatter, "Database error: {}", e),
-            ReadingError::ValidationError(msg) => write!(formatter, "Validation error: {}", msg),
-            ReadingError::InternalError => write!(formatter, "Internal error"),
+            ReadingError::Database(e) => write!(formatter, "Database error: {}", e),
+            ReadingError::Internal(e) => write!(formatter, "Internal error: {}", e),
         }
-    }
-}
-
-impl From<sqlx::Error> for ReadingError {
-    fn from(err: sqlx::Error) -> Self {
-        ReadingError::DatabaseError(err.to_string())
     }
 }

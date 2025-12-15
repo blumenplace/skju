@@ -14,8 +14,7 @@ pub async fn create_reading(
         .app_services
         .reading_service
         .create(reading)
-        .await
-        .map_err(|_| ApiError::Internal)?;
+        .await?;
 
     let response = (StatusCode::CREATED, ());
 
@@ -30,11 +29,8 @@ pub async fn get_readings_between(
         .app_services
         .reading_service
         .get_between(request)
-        .await
-        .map_err(|e| {
-            println!("{:?}", e);
-            ApiError::Internal
-        })?;
+        .await?;
+
     let response = (StatusCode::OK, Json(readings));
 
     Ok(response)

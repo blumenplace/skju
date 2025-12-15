@@ -31,22 +31,18 @@ pub struct SensorUpdateRequest {
 #[derive(Debug)]
 pub enum SensorError {
     NotFound,
-    DatabaseError(String),
-    ValidationError(String),
+    Internal(String),
+    Database(String),
+    Validation(String),
 }
 
 impl fmt::Display for SensorError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SensorError::NotFound => write!(formatter, "Sensor not found"),
-            SensorError::DatabaseError(e) => write!(formatter, "Database error: {}", e),
-            SensorError::ValidationError(msg) => write!(formatter, "Validation error: {}", msg),
+            SensorError::Internal(e) => write!(formatter, "Internal error: {}", e),
+            SensorError::Database(e) => write!(formatter, "Database error: {}", e),
+            SensorError::Validation(e) => write!(formatter, "Validation error: {}", e),
         }
-    }
-}
-
-impl From<sqlx::Error> for SensorError {
-    fn from(err: sqlx::Error) -> Self {
-        SensorError::DatabaseError(err.to_string())
     }
 }
