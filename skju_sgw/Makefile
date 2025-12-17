@@ -19,9 +19,9 @@ build: deny fmt
 renode: build
 	@$(CONTAINER) run -it --rm \
 	  -v "$(PWD)":/app -w /app \
-	  -e FIRMWARE_PATH="/app/$(FIRMWARE_PATH)" \
+	  -e FIRMWARE_PATH?="/app/$(FIRMWARE_PATH)" \
 	  antmicro/renode:latest \
-	  renode /app/scripts/nrf9161dk.resc
+	  renode -e 'set FIRMWARE_PATH "/app/$(FIRMWARE_PATH)"; start @/app/scripts/nrf9161dk.resc'
 
 flash:
 	@probe-rs attach --chip nRF9161_xxAA --defmt

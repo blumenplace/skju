@@ -108,7 +108,7 @@ egu5 : Miscellaneous.NRF52840_EGU @ sysbus 0x40019000
 
 sysbus:
     init:
-        ApplySVD @https://dl.antmicro.com/projects/renode/svd/NRF52840.svd.gz
+        ApplySVD @/app/scripts/nrf9160.svd.gz
         Tag <0x10000000, 0x10000FFF> "FICR"
         Tag <0x100000a0, 0x100000a3> "DEVICEADDRTYPE" 0x1 # random address
         Tag <0x100000a4, 0x100000a7> "DEVICEADDR[0]" 0xAABBCCDD
