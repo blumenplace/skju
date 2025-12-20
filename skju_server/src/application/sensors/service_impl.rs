@@ -1,6 +1,6 @@
 use super::SensorService;
 use crate::application::messages::AppMessage;
-use crate::domain::sensor::{Sensor, SensorCreateRequest, SensorError, SensorUpdateRequest};
+use crate::domain::sensor::{Sensor, SensorCreate, SensorError, SensorID, SensorUpdate};
 use crate::ports::bus_service::BusService;
 use crate::ports::sensors_repository::SensorRepository;
 use async_trait::async_trait;
@@ -20,17 +20,17 @@ impl Service {
 
 #[async_trait]
 impl SensorService for Service {
-    async fn create(&self, request: SensorCreateRequest) -> Result<Sensor, SensorError> {
+    async fn create(&self, request: SensorCreate) -> Result<Sensor, SensorError> {
         let result = self.repository.create(request).await?;
         Ok(result)
     }
 
-    async fn update(&self, id: i32, request: SensorUpdateRequest) -> Result<Sensor, SensorError> {
+    async fn update(&self, id: SensorID, request: SensorUpdate) -> Result<Sensor, SensorError> {
         let result = self.repository.update(id, request).await?;
         Ok(result)
     }
 
-    async fn delete(&self, id: i32) -> Result<(), SensorError> {
+    async fn delete(&self, id: SensorID) -> Result<(), SensorError> {
         self.repository.delete(id).await?;
         Ok(())
     }
@@ -40,7 +40,7 @@ impl SensorService for Service {
         Ok(result)
     }
 
-    async fn get_by_id(&self, id: i32) -> Result<Option<Sensor>, SensorError> {
+    async fn get_by_id(&self, id: SensorID) -> Result<Option<Sensor>, SensorError> {
         let result = self.repository.get_by_id(id).await?;
         Ok(result)
     }

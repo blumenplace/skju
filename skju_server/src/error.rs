@@ -1,9 +1,9 @@
 use crate::domain::reading::ReadingError;
 use crate::domain::sensor::SensorError;
 use axum::{
-    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
+    Json,
 };
 use serde_json::json;
 
@@ -43,6 +43,7 @@ impl From<ReadingError> for ApiError {
         match error {
             ReadingError::Database(_) => ApiError::Internal,
             ReadingError::Internal(_) => ApiError::Internal,
+            ReadingError::InvalidRange(_) => ApiError::BadRequest("Invalid range".to_string()),
         }
     }
 }

@@ -1,6 +1,6 @@
-use crate::domain::reading::ReadingCreateRequest;
+use crate::domain::reading::ReadingCreate;
 
 #[derive(Debug)]
 pub enum AppMessage {
-    SensorReadingReceived(ReadingCreateRequest),
+    SensorReadingReceived(ReadingCreate),
 }

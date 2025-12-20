@@ -1,6 +1,6 @@
 use super::ReadingService;
 use crate::application::messages::AppMessage;
-use crate::domain::reading::{Reading, ReadingCreateRequest, ReadingError, ReadingGetBetweenRequest};
+use crate::domain::reading::{Reading, ReadingCreate, ReadingError, ReadingsRange};
 use crate::ports::bus_service::{BusMessage, BusService};
 use crate::ports::reading_repository::ReadingRepository;
 use async_trait::async_trait;
@@ -20,7 +20,7 @@ impl Service {
 
 #[async_trait]
 impl ReadingService for Service {
-    async fn create(&self, request: ReadingCreateRequest) -> Result<(), ReadingError> {
+    async fn create(&self, request: ReadingCreate) -> Result<(), ReadingError> {
         let message = BusMessage {
             message: AppMessage::SensorReadingReceived(request),
         };
@@ -33,7 +33,7 @@ impl ReadingService for Service {
         Ok(())
     }
 
-    async fn get_between(&self, request: ReadingGetBetweenRequest) -> Result<Vec<Reading>, ReadingError> {
+    async fn get_between(&self, request: ReadingsRange) -> Result<Vec<Reading>, ReadingError> {
         self.repository.get_between(request).await
     }
 }

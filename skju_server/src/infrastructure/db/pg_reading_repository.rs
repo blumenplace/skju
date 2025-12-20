@@ -1,4 +1,4 @@
-use crate::domain::reading::{Reading, ReadingCreateRequest, ReadingError, ReadingGetBetweenRequest};
+use crate::domain::reading::{DBReading, Reading, ReadingCreate, ReadingError, ReadingsRange};
 use crate::ports::reading_repository::ReadingRepository;
 use async_trait::async_trait;
 use sqlx::query_builder::Separated;
@@ -22,13 +22,13 @@ impl From<sqlx::Error> for ReadingError {
 
 #[async_trait]
 impl ReadingRepository for PgReadingRepository {
-    async fn create(&self, request: Vec<ReadingCreateRequest>) -> Result<(), ReadingError> {
+    async fn create(&self, request: Vec<ReadingCreate>) -> Result<(), ReadingError> {
         let mut query_builder = QueryBuilder::new(r#"INSERT INTO readings (sensor_id, value, timestamp)"#);
-        let bind_values = |mut builder: Separated<Postgres, &str>, reading: ReadingCreateRequest| {
+        let bind_values = |mut builder: Separated<Postgres, &str>, reading: ReadingCreate| {
             builder
-                .push_bind(reading.sensor_id)
-                .push_bind(reading.value)
-                .push_bind(reading.timestamp);
+                .push_bind(reading.sensor_id.value())
+                .push_bind(reading.value.value())
+                .push_bind(reading.timestamp.value());
         };
 
         query_builder
@@ -40,27 +40,26 @@ impl ReadingRepository for PgReadingRepository {
         Ok(())
     }
 
-    async fn get_between(&self, request: ReadingGetBetweenRequest) -> Result<Vec<Reading>, ReadingError> {
+    async fn get_between(&self, request: ReadingsRange) -> Result<Vec<Reading>, ReadingError> {
         let mut query_builder = QueryBuilder::new(r#"SELECT * FROM readings WHERE timestamp >= "#);
 
-        query_builder.push_bind(request.from);
+        query_builder.push_bind(request.from().value());
+        query_builder.push(" AND timestamp <= ");
+        query_builder.push_bind(request.to().value());
 
-        if let Some(sensor_id) = request.sensor_id {
+        if let Some(sensor_id) = request.sensor_id() {
             query_builder.push(" AND sensor_id = ");
-            query_builder.push_bind(sensor_id);
-        }
-
-        if let Some(to) = request.to {
-            query_builder.push(" AND timestamp <= ");
-            query_builder.push_bind(to);
+            query_builder.push_bind(sensor_id.value());
         }
 
         query_builder.push(" ORDER BY timestamp ASC");
 
         let readings = query_builder
-            .build_query_as::<Reading>()
+            .build_query_as::<DBReading>()
             .fetch_all(&self.pool)
             .await?;
+        
+        let readings = readings.into_iter().map(Into::into).collect();
 
         Ok(readings)
     }

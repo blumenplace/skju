@@ -1,10 +1,10 @@
-use crate::domain::reading::{ReadingCreateRequest, ReadingError};
+use crate::domain::reading::{ReadingCreate, ReadingError};
 use crate::ports::reading_repository::ReadingRepository;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub struct ReadingsBuffer {
-    pub readings: Mutex<Vec<ReadingCreateRequest>>,
+    pub readings: Mutex<Vec<ReadingCreate>>,
     pub max_readings: usize,
     pub readings_repository: Arc<dyn ReadingRepository>,
 }
@@ -21,20 +21,20 @@ impl ReadingsBuffer {
     pub async fn flush(&self) -> Result<(), ReadingError> {
         let readings_to_commit = {
             let mut readings = self.readings.lock().await;
-            readings.drain(..).collect::<Vec<ReadingCreateRequest>>()
+            readings.drain(..).collect::<Vec<ReadingCreate>>()
         };
 
         self.try_commit(readings_to_commit).await
     }
 
-    pub async fn add(&self, reading: ReadingCreateRequest) -> Result<(), ReadingError> {
+    pub async fn add(&self, reading: ReadingCreate) -> Result<(), ReadingError> {
         let readings_to_commit = {
             let mut readings = self.readings.lock().await;
 
             readings.push(reading);
 
             if readings.len() >= self.max_readings {
-                readings.drain(..).collect::<Vec<ReadingCreateRequest>>()
+                readings.drain(..).collect::<Vec<ReadingCreate>>()
             } else {
                 vec![]
             }
@@ -45,7 +45,7 @@ impl ReadingsBuffer {
         Ok(())
     }
 
-    async fn try_commit(&self, readings: Vec<ReadingCreateRequest>) -> Result<(), ReadingError> {
+    async fn try_commit(&self, readings: Vec<ReadingCreate>) -> Result<(), ReadingError> {
         if !readings.is_empty() {
             self.readings_repository.create(readings).await?;
         }
