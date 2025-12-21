@@ -1,0 +1,5 @@
+using sysbus
+mach create
+machine LoadPlatformDescription @/app/scripts/nrf9161dk.repl
+sysbus LoadELF $FIRMWARE_PATH
+start
