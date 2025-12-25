@@ -1,6 +1,6 @@
 [workspace]
 members = ["skju", "skju_emulator", "skju_core"]
-exclude = ["skju_sgw"]
+exclude = ["skju_sgw", "skju_sn"]
 resolver = "2"
 
 [workspace.dependencies]
