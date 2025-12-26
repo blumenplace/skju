@@ -2,4 +2,5 @@ using sysbus
 mach create
 machine LoadPlatformDescription @/app/scripts/nrf52840dk.repl
 sysbus LoadELF $FIRMWARE_PATH
+logLevel -1
 start
