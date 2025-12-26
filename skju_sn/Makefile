@@ -21,7 +21,7 @@ renode: build
 	  -v "$(PWD)":/app -w /app \
 	  -e FIRMWARE_PATH?="/app/$(FIRMWARE_PATH)" \
 	  antmicro/renode:latest \
-	  renode -e 'set FIRMWARE_PATH "/app/$(FIRMWARE_PATH)"; start @/app/scripts/nrf52840dk.resc'
+	  renode --disable-gui --console -e 'set FIRMWARE_PATH "/app/$(FIRMWARE_PATH)"; start @/app/scripts/nrf52840dk.resc'
 
 flash:
 	@probe-rs attach --chip nRF52840_xxAA --defmt
