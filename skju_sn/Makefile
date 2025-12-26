@@ -20,11 +20,15 @@ renode: build
 	@$(CONTAINER) run -it --rm \
 	  -v "$(PWD)":/app -w /app \
 	  -e FIRMWARE_PATH?="/app/$(FIRMWARE_PATH)" \
+	  -p 3333:3333 \
 	  antmicro/renode:latest \
 	  renode --disable-gui --console -e 'set FIRMWARE_PATH "/app/$(FIRMWARE_PATH)"; start @/app/scripts/nrf52840dk.resc'
 
 flash:
 	@probe-rs attach --chip nRF52840_xxAA --defmt
+
+gdb: build
+	arm-none-eabi-gdb -x gdb-commands.gdb ${FIRMWARE_PATH}
 
 clean:
 	@cargo clean

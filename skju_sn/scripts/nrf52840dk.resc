@@ -1,6 +1,22 @@
 using sysbus
-mach create
-machine LoadPlatformDescription @/app/scripts/nrf52840dk.repl
-sysbus LoadELF $FIRMWARE_PATH
+
 logLevel -1
+
+mach create "skju_sensor_node"
+machine LoadPlatformDescription @/app/scripts/nrf52840dk.repl
+machine StartGdbServer 3333 false
+
+# sysbus CreateRTT "rtt"
+# rtt Scan
+# rtt CreateChannel 0 true true "up0"
+
+sysbus LoadELF $FIRMWARE_PATH
+# cpu LogFunctionNames true
+
+# sysbus LogPeripheralAccess <peripheral-name> true
+sysbus LogAllPeripheralsAccess true
+
+# showAnalyzer uart0
+# emulation CreateTerminalWindow "RTT defmt" "up0"
+
 start
