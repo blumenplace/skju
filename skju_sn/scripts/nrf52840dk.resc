@@ -1,6 +1,24 @@
 using sysbus
-mach create
-machine LoadPlatformDescription @/app/scripts/nrf52840dk.repl
-sysbus LoadELF $FIRMWARE_PATH
+
 logLevel -1
+
+mach create "skju_sensor_node"
+machine LoadPlatformDescription @/workspace/scripts/nrf52840dk.repl
+machine StartGdbServer 3333 false
+
+machine CreateVirtualConsole "segger_rtt"
+include @/opt/renode/scripts/single-node/segger-rtt.py
+setup_segger_rtt sysbus.segger_rtt false false false
+showAnalyzer sysbus.segger_rtt
+
+
+sysbus LoadELF $FIRMWARE_PATH
+# cpu LogFunctionNames true
+
+# sysbus LogPeripheralAccess <peripheral-name> true
+sysbus LogAllPeripheralsAccess true
+
+# showAnalyzer uart0
+# emulation CreateTerminalWindow "RTT defmt" "up0"
+
 start

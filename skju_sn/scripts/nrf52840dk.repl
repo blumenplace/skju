@@ -1,4 +1,4 @@
-using "/app/scripts/nrf52840.repl"
+using "/workspace/scripts/nrf52840.repl"
 
 gpio0:
     13 -> led0@0

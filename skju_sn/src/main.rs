@@ -21,13 +21,18 @@ async fn main(spawner: Spawner) {
 async fn blink_task(pin: Peri<'static, AnyPin>) {
     let mut led = Output::new(pin, Level::Low, OutputDrive::Standard);
 
+    let mut counter = 0usize;
     loop {
         defmt::info!("LED tick");
 
         led.set_high();
-        Timer::after_millis(300).await;
+        Timer::after_millis(500).await;
 
         led.set_low();
-        Timer::after_millis(300).await;
+        Timer::after_millis(500).await;
+
+        defmt::info!("SKJU loop iteration {}", counter);
+
+        counter = counter.saturating_add(1);
     }
 }
