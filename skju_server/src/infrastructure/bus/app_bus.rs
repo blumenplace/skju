@@ -1,8 +1,9 @@
 use crate::application::messages::AppMessage;
 use crate::ports::bus_service::{BusError, BusMessage, BusService};
 use async_trait::async_trait;
-use tokio::sync::mpsc::Sender;
 use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::Sender;
+use tracing::instrument;
 
 pub struct AppBus {
     sender: Sender<BusMessage<AppMessage>>,
@@ -22,6 +23,7 @@ impl From<SendError<BusMessage<AppMessage>>> for BusError<AppMessage> {
 
 #[async_trait]
 impl BusService<AppMessage> for AppBus {
+    #[instrument(name = "pipeline.app_bus.send", skip(self), err)]
     async fn send(&self, message: BusMessage<AppMessage>) -> Result<(), BusError<AppMessage>> {
         self.sender.send(message).await.map_err(Into::into)
     }

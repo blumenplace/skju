@@ -17,6 +17,12 @@ impl<T: Debug> Display for BusMessage<T> {
     }
 }
 
+impl<T: Debug> Display for BusError<T> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{:?}", self)
+    }
+}
+
 #[async_trait]
 pub trait BusService<T: Debug>: Send + Sync + 'static {
     async fn send(&self, message: BusMessage<T>) -> Result<(), BusError<T>>;

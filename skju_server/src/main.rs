@@ -12,13 +12,24 @@ mod state;
 use crate::app::create_app;
 use crate::config::Config;
 use dotenvy::dotenv;
+use opentelemetry::trace::TracerProvider;
+use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
+use opentelemetry_otlp::{LogExporter, Protocol, WithExportConfig};
+use opentelemetry_sdk::Resource;
+use opentelemetry_sdk::logs::SdkLoggerProvider;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 use tokio::net::TcpListener;
+use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{EnvFilter, registry};
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    init_tracing();
 
     let config = Config::from_env();
     let pool = get_db_pool(&config).await;
@@ -31,6 +42,47 @@ async fn main() {
     axum::serve(listener, app)
         .await
         .expect("Failed to start server");
+}
+
+fn init_tracing() {
+    let provider_resource = Resource::builder().with_service_name("skju").build();
+    let trace_exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .with_protocol(Protocol::Grpc)
+        .with_endpoint("http://localhost:4317")
+        .build()
+        .expect("Error building GRPC exporter");
+
+    let log_exporter = LogExporter::builder()
+        .with_http()
+        .with_protocol(Protocol::HttpJson)
+        .with_endpoint("http://localhost:4318/v1/logs")
+        .build()
+        .expect("Error building log exporter");
+
+    let trace_provider = SdkTracerProvider::builder()
+        .with_batch_exporter(trace_exporter)
+        .with_resource(provider_resource.clone())
+        .build();
+
+    let log_provider = SdkLoggerProvider::builder()
+        .with_batch_exporter(log_exporter)
+        .with_resource(provider_resource.clone())
+        .build();
+
+    let log_layer = OpenTelemetryTracingBridge::new(&log_provider);
+    let trace_layer = OpenTelemetryLayer::new(trace_provider.tracer("skju"));
+    let debug_layer = tracing_subscriber::fmt::layer()
+        .compact()
+        .with_line_number(true)
+        .with_target(false);
+
+    registry()
+        .with(EnvFilter::from_default_env())
+        .with(debug_layer)
+        .with(log_layer)
+        .with(trace_layer)
+        .init();
 }
 
 async fn get_db_pool(config: &Config) -> Pool<Postgres> {

@@ -17,3 +17,11 @@ tokio = { version = "1", features = ["full"] }
 tower = "0.5.2"
 tower-http = { version = "0.6.8", features = ["full"] }
 sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "macros", "chrono"] }
+
+opentelemetry = "0.31.0"
+opentelemetry_sdk = { version = "0.31.0" }
+opentelemetry-otlp = { version = "0.31.0", features = ["grpc-tonic"] }
+opentelemetry-appender-tracing = { version = "0.31.0" }
+tracing = "0.1.44"
+tracing-opentelemetry = "0.32"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
