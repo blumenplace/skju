@@ -5,9 +5,11 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Json, Router};
 use serde_json::json;
+use tower_http::trace::TraceLayer;
 
 pub fn create_routes() -> Router<AppState> {
     Router::new()
+        .layer(TraceLayer::new_for_http())
         .nest("/sensors", sensors::routes())
         .nest("/readings", readings::routes())
         .fallback(get(fallback))

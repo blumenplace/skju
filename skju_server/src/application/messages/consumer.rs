@@ -3,6 +3,7 @@ use crate::application::readings::ReadingsBuffer;
 use crate::ports::bus_service::BusMessage;
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
+use tracing::instrument;
 
 pub struct ConsumerContext {
     pub readings_buffer: Arc<ReadingsBuffer>,
@@ -18,19 +19,22 @@ impl AppConsumer {
         Self { receiver, context }
     }
 
+    #[instrument(name = "pipeline.app_consumer.run", skip(self))]
     pub async fn run(mut self) {
         while let Some(message) = self.receiver.recv().await {
             let message_str = message.to_string();
 
             if let Err(error) = self.dispatch(message).await {
-                eprintln!(
+                tracing::error!(
                     "Failed to dispatch message.\n Message:  {}.\n Error: {}",
-                    message_str, error
-                );
+                    message_str,
+                    error
+                )
             };
         }
     }
 
+    #[instrument(name = "pipeline.app_consumer.dispatch", skip(self), err)]
     async fn dispatch(&self, message: BusMessage<AppMessage>) -> Result<(), String> {
         match message.message {
             AppMessage::SensorReadingReceived(reading) => {

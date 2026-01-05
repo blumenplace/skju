@@ -5,6 +5,7 @@ use crate::ports::bus_service::{BusMessage, BusService};
 use crate::ports::reading_repository::ReadingRepository;
 use async_trait::async_trait;
 use std::sync::Arc;
+use tracing::instrument;
 
 #[derive(Clone)]
 pub struct Service {
@@ -20,6 +21,7 @@ impl Service {
 
 #[async_trait]
 impl ReadingService for Service {
+    #[instrument(name = "service.reading.create", skip(self))]
     async fn create(&self, request: ReadingCreate) -> Result<(), ReadingError> {
         let message = BusMessage {
             message: AppMessage::SensorReadingReceived(request),
@@ -33,6 +35,7 @@ impl ReadingService for Service {
         Ok(())
     }
 
+    #[instrument(name = "service.reading.get_between", skip(self))]
     async fn get_between(&self, request: ReadingsRange) -> Result<Vec<Reading>, ReadingError> {
         self.repository.get_between(request).await
     }

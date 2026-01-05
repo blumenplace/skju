@@ -73,6 +73,6 @@ where
 
 async fn flush_readings(buffer: Arc<ReadingsBuffer>) {
     if let Err(error) = buffer.flush().await {
-        eprintln!("Failed to flush readings: {}", error);
+        tracing::error!("Failed to flush readings: {}", error);
     }
 }

@@ -3,6 +3,7 @@ use crate::ports::reading_repository::ReadingRepository;
 use async_trait::async_trait;
 use sqlx::query_builder::Separated;
 use sqlx::{PgPool, Postgres, QueryBuilder};
+use tracing::instrument;
 
 pub struct PgReadingRepository {
     pool: PgPool,
@@ -22,6 +23,7 @@ impl From<sqlx::Error> for ReadingError {
 
 #[async_trait]
 impl ReadingRepository for PgReadingRepository {
+    #[instrument(name = "repo.reading.create", skip(self))]
     async fn create(&self, request: Vec<ReadingCreate>) -> Result<(), ReadingError> {
         let mut query_builder = QueryBuilder::new(r#"INSERT INTO readings (sensor_id, value, timestamp)"#);
         let bind_values = |mut builder: Separated<Postgres, &str>, reading: ReadingCreate| {
@@ -40,6 +42,7 @@ impl ReadingRepository for PgReadingRepository {
         Ok(())
     }
 
+    #[instrument(name = "repo.reading.get_between", skip(self))]
     async fn get_between(&self, request: ReadingsRange) -> Result<Vec<Reading>, ReadingError> {
         let mut query_builder = QueryBuilder::new(r#"SELECT * FROM readings WHERE timestamp >= "#);
 
@@ -58,7 +61,7 @@ impl ReadingRepository for PgReadingRepository {
             .build_query_as::<DBReading>()
             .fetch_all(&self.pool)
             .await?;
-        
+
         let readings = readings.into_iter().map(Into::into).collect();
 
         Ok(readings)

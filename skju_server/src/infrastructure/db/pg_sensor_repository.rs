@@ -2,7 +2,9 @@ use crate::domain::sensor::{DBSensor, Sensor, SensorCreate, SensorError, SensorI
 use crate::ports::sensors_repository::SensorRepository;
 use async_trait::async_trait;
 use sqlx::{query, query_as, PgPool};
+use tracing::instrument;
 
+#[derive(Debug)]
 pub struct PgSensorRepository {
     pool: PgPool,
 }
@@ -21,6 +23,7 @@ impl From<sqlx::Error> for SensorError {
 
 #[async_trait]
 impl SensorRepository for PgSensorRepository {
+    #[instrument(name = "repo.sensor.create", skip(self))]
     async fn create(&self, request: SensorCreate) -> Result<Sensor, SensorError> {
         let sensor = query_as!(
             DBSensor,
@@ -36,6 +39,7 @@ impl SensorRepository for PgSensorRepository {
         Ok(sensor.into())
     }
 
+    #[instrument(name = "repo.sensor.update", skip(self))]
     async fn update(&self, id: SensorID, request: SensorUpdate) -> Result<Sensor, SensorError> {
         self.check_if_exists(id).await?;
 
@@ -54,6 +58,7 @@ impl SensorRepository for PgSensorRepository {
         Ok(sensor.into())
     }
 
+    #[instrument(name = "repo.sensor.delete", skip(self))]
     async fn delete(&self, id: SensorID) -> Result<(), SensorError> {
         self.check_if_exists(id).await?;
 
@@ -64,6 +69,7 @@ impl SensorRepository for PgSensorRepository {
         Ok(())
     }
 
+    #[instrument(name = "repo.sensor.list", skip(self))]
     async fn list(&self) -> Result<Vec<Sensor>, SensorError> {
         let sensors = query_as!(DBSensor, r#"SELECT * From sensors"#)
             .fetch_all(&self.pool)
@@ -77,6 +83,7 @@ impl SensorRepository for PgSensorRepository {
         Ok(sensors)
     }
 
+    #[instrument(name = "repo.sensor.get_by_id", skip(self))]
     async fn get_by_id(&self, id: SensorID) -> Result<Option<Sensor>, SensorError> {
         let sensor = query_as!(DBSensor, r#"SELECT * FROM sensors WHERE id = $1"#, id.value())
             .fetch_optional(&self.pool)
@@ -91,6 +98,7 @@ impl SensorRepository for PgSensorRepository {
         Ok(sensor)
     }
 
+    #[instrument(name = "repo.sensor.delete_all", skip(self))]
     async fn delete_all(&self) -> Result<(), SensorError> {
         query!(r#"DELETE FROM sensors"#).execute(&self.pool).await?;
         Ok(())
