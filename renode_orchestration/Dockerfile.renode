@@ -1,0 +1,47 @@
+FROM ubuntu:24.04
+
+ARG RENODE_VERSION=1.16.0
+ARG RENODE_PKG=linux-portable-dotnet
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+RUN apt-get update && apt-get install -y \
+  wget \
+  curl \
+  git \
+  policykit-1 \
+  uml-utilities \
+  gdb-multiarch \
+  python3 \
+  python3-pip \
+  dotnet8 \
+  screen \
+  xvfb \
+  x11vnc && \
+  rm -rf /var/lib/apt/lists/*
+
+RUN wget -q https://github.com/renode/renode/releases/download/v${RENODE_VERSION}/renode-${RENODE_VERSION}.${RENODE_PKG}.tar.gz && \
+    mkdir -p /opt/renode && \
+    tar -xzf renode-${RENODE_VERSION}.${RENODE_PKG}.tar.gz -C /opt/renode --strip-components=1 && \
+    rm renode-${RENODE_VERSION}.${RENODE_PKG}.tar.gz
+
+ENV PATH=/opt/renode:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+# ENV PATH="/root/.cargo/bin:${PATH}"
+# COPY ./rust-toolchain.toml /tmp/rust-toolchain.toml
+# RUN mkdir -p /tmp && \
+#    cd /tmp && \
+#    cargo new --bin tgt && \
+#    mv /tmp/rust-toolchain.toml /tmp/tgt/rust-toolchain.toml && \
+#    cd /tmp/tgt && \
+#    cargo build
+
+WORKDIR /workspace
+
+EXPOSE 3333
+EXPOSE 3334
+EXPOSE 5900
+
+CMD ["/bin/bash"]
