@@ -1,6 +1,6 @@
 // Instantiate your C# Mpu6500 peripheral and connect it to the spi2 controller
 mpu6500: Antmicro.Renode.Peripherals.Sensors.Mpu6500 @ spi2
 
-// If your Rust code uses a specific GPIO pin for Chip Select (CS),
-// connect it here. For example, if using P0.25:
-// gpio0: 25 -> mpu6500@0
+// Connect Chip Select (CS) pin P0.30
+// gpio0:
+//    30 -> mpu6500@0
