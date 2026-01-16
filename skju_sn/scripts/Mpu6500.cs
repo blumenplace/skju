@@ -31,8 +31,6 @@ namespace Antmicro.Renode.Peripherals.Sensors
         public void Reset()
         {
             RegistersCollection.Reset();
-            registers[(int)Registers.WhoAmI] = MPU6500;
-            registers[(int)Registers.PowerManagement1] = 0x41; // Default power management state
         }
 
         public byte Transmit(byte data)
@@ -78,27 +76,19 @@ namespace Antmicro.Renode.Peripherals.Sensors
 
         private void DefineRegisters()
         {
-            // Initialize register array
-            registers = new byte[128];
-            
-            // Register to indicate to user which device is being accessed.
             Registers.WhoAmI.Define(this)
-                .WithValueField(0, 8, FieldMode.Read, valueProviderCallback: _ => MPU6500, name: "WHO_AM_I");
+                .WithValueField(0, 8, FieldMode.Read, valueProviderCallback: _ => {
+                    this.Log(LogLevel.Debug, "Reading WhoAmI register...");
+                    return MPU6500;
+                }, name: "WHO_AM_I");
 
             Registers.GyroConfiguration.Define(this)
-            /*
-                .WithFlag(7, FieldMode.Read | FieldMode.Write, name: "X Gyro self-test", ) // XG_ST
-                .WithFlag(6, FieldMode.Read | FieldMode.Write, name: "Y Gyro self-test", ) // YG_ST
-                .WithFlag(5, FieldMode.Read | FieldMode.Write, name: "Z Gyro self-test", ) // ZG_ST
-                .WithFlag(4,)
-                .WithEnumField(0, 3, out responseTypeField, name: "respone_type")
-                .WithReservedBits(3, 2)
-                            .WithEnumField<DoubleWordRegister, TransferType>(5, 3, out transferTypeField, name: "transfer_type")
-                            .WithIgnoredBits(8, 24);*/
-
-
-                .WithValueField(0, 8, FieldMode.Read | FieldMode.Write, name: "GYRO_CONFIG");
-
+                .WithFlag(7, FieldMode.Read | FieldMode.Write, name: "X Gyro self-test") // XG_ST
+                .WithFlag(6, FieldMode.Read | FieldMode.Write, name: "Y Gyro self-test") // YG_ST
+                .WithFlag(5, FieldMode.Read | FieldMode.Write, name: "Z Gyro self-test") // ZG_ST
+                .WithValueField(3, 2, FieldMode.Read | FieldMode.Write, name: "Gyro Full Scale Select") // GYRO_FS_SEL
+                .WithReservedBits(2, 1)
+                .WithValueField(0, 2, FieldMode.Read | FieldMode.Write, name: "Gyro bypass DLPF"); // FCHOICE_B
                 
             Registers.PowerManagement1.Define(this)
                 .WithValueField(0, 8, FieldMode.Read | FieldMode.Write, name: "PWR_MGMT_1");
@@ -209,6 +199,17 @@ namespace Antmicro.Renode.Peripherals.Sensors
             Dps1000 = 0b10,
             Dps2000 = 0b11
         }
+
+        private class GyroConfigurationRegister {
+            private IFlagRegisterField gyroXSelfTest;
+            private IFlagRegisterField gyroYSelfTest;
+            private IFlagRegisterField gyroZSelfTest;
+
+            // private IValueRegisterField sample;
+            // private IEnumRegisterField<ResponseType> responseTypeField;
+        }
+
+        private GyroConfigurationRegister gyroConfigurationRegister;
 
         private enum Registers
         {
