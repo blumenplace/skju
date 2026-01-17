@@ -5,12 +5,24 @@ use embassy_executor::Spawner;
 use embassy_nrf::Peri;
 use embassy_nrf::gpio::{AnyPin, Level, Output, OutputDrive};
 use embassy_time::Timer;
+use nrf_softdevice::ble::peripheral::ConnectableAdvertisement;
 use {defmt_rtt as _, panic_probe as _};
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
     let p = embassy_nrf::init(Default::default());
-    defmt::info!("SKJU sgw starting");
+    let config = nrf_softdevice::Config::default();
+    let instance = nrf_softdevice::Softdevice::enable(&config);
+
+    defmt::info!("SKJU sn starting");
+
+    spawner
+        .spawn(ble_softdevice_task(&instance))
+        .expect("softdevice task failed to spawn");
+
+    spawner
+        .spawn(ble_advertisement_task(&instance))
+        .expect("advertisement task failed");
 
     spawner
         .spawn(blink_task(p.P0_13.into()))
@@ -35,4 +47,22 @@ async fn blink_task(pin: Peri<'static, AnyPin>) {
 
         counter = counter.saturating_add(1);
     }
+}
+
+#[embassy_executor::task]
+async fn ble_softdevice_task(instance: &'static nrf_softdevice::Softdevice) {
+    instance.run().await;
+}
+
+#[embassy_executor::task]
+async fn ble_advertisement_task(instance: &'static nrf_softdevice::Softdevice) {
+    let peripheral_config = nrf_softdevice::ble::peripheral::Config::default();
+    let advert = ConnectableAdvertisement::ScannableUndirected {
+        adv_data: "SKJU sn".as_bytes(),
+        scan_data: &[],
+    };
+
+    nrf_softdevice::ble::peripheral::advertise_connectable(&instance, advert, &peripheral_config)
+        .await
+        .unwrap();
 }
