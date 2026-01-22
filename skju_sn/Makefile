@@ -15,7 +15,7 @@ endif
 
 FIRMWARE_PATH := ./target/thumbv7em-none-eabihf/debug/skju_sn
 
-.PHONY: run clean fmt deny renode renode-img
+.PHONY: run clean fmt deny renode renode-img logs
 
 deny:
 	@cargo deny check
@@ -24,7 +24,7 @@ fmt:
 	@cargo fmt --check
 
 build: deny fmt
-	@cargo build
+	@DEFMT_LOG=trace cargo build
 
 renode-img:
 	@$(CONTAINER) build --platform $(RENODE_PLATFORM) --build-arg RENODE_VERSION=$(RENODE_VERSION) --build-arg RENODE_PKG=$(RENODE_PKG) -t skju-renode -f Dockerfile.renode .
@@ -35,8 +35,12 @@ renode: renode-img build
 	  -w /workspace \
 	  -e FIRMWARE_PATH?="/workspace/$(FIRMWARE_PATH)" \
 	  -p 3333:3333 \
+	  -p 19021:19021 \
 	  skju-renode:latest \
 	  renode --disable-gui --console -e 'set FIRMWARE_PATH "/workspace/$(FIRMWARE_PATH)"; start @/workspace/scripts/nrf52840dk.resc'
+
+logs:
+	@defmt-print -e ${FIRMWARE_PATH} tcp --host localhost --port 19021
 
 flash:
 	@probe-rs attach --chip nRF52840_xxAA --defmt
@@ -46,3 +50,4 @@ gdb: build
 
 clean:
 	@cargo clean
+

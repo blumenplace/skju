@@ -17,14 +17,20 @@ using Antmicro.Renode.Utilities;
 
 namespace Antmicro.Renode.Peripherals.Sensors
 {
-    public class Mpu6500 : ISPIPeripheral, IProvidesRegisterCollection<ByteRegisterCollection>, ISensor
+    public class Mpu6500 : ISPIPeripheral,
+        IProvidesRegisterCollection<ByteRegisterCollection>,
+        ISensor
     {
         public Mpu6500()
         {
-            RegistersCollection = new ByteRegisterCollection(this);
+            Log(LogLevel.Debug, "Initializing MPU6500 sensor...");
+
             random = EmulationManager.Instance.CurrentEmulation.RandomGenerator;
-            
+            Interrupt = new GPIO();
+
+            RegistersCollection = new ByteRegisterCollection(this);
             DefineRegisters();
+
             Reset();
         }
 
@@ -108,38 +114,13 @@ namespace Antmicro.Renode.Peripherals.Sensors
 
         private byte ReadRegister(byte address)
         {
-            switch (address)
-            {
-                case var addr when addr >= 0x3B && addr <= 0x40: // Accelerometer data
-                    return GenerateAccelData(addr);
-                    
-                case var addr when addr >= 0x41 && addr <= 0x42: // Temperature data
-                    return GenerateTemperatureData(addr);
-                    
-                case var addr when addr >= 0x43 && addr <= 0x48: // Gyroscope data
-                    return GenerateGyroData(addr);
-                    
-                default:
-                    if (address < registers.Length)
-                    {
-                        return registers[address];
-                    }
-                    this.Log(LogLevel.Warning, "Reading from undefined register {0}", (Registers)address);
-                    return 0x00;
-            }
+            this.Log(LogLevel.Debug, "Read from Registers");
+            return 0x00;
         }
 
         private void WriteRegister(byte address, byte value)
         {
-            if (address < registers.Length)
-            {
-                registers[address] = value;
-                this.Log(LogLevel.Debug, "Write to register {0}: 0x{1:X2}", (Registers)address, value);
-            }
-            else
-            {
-                this.Log(LogLevel.Warning, "Writing to undefined register {0}", (Registers)address);
-            }
+            this.Log(LogLevel.Debug, "Write to Registers; 0x{0:X2}, 0x{0:X2}", address, value);
         }
 
         private byte GenerateAccelData(byte address)
@@ -249,10 +230,12 @@ namespace Antmicro.Renode.Peripherals.Sensors
             PowerManagement2 = 0x6C,
         }
 
-        private byte[] registers;
+        public GPIO Interrupt { get; }
+
         private byte currentRegister;
         private bool isReadOperation;
         private bool isFirstByte = true;
+
         private readonly PseudorandomNumberGenerator random;
 
         private const byte MPU6500 = 0x70;
