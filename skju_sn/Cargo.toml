@@ -3,12 +3,18 @@ name = "skju_sn"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["rtt"]
+rtt = ["dep:defmt-rtt"]
+#semihosting = ["dep:defmt-semihosting"]
+
 [dependencies]
 cortex-m = { version = "0.7.7", features = ["inline-asm", "critical-section-single-core"] }
 cortex-m-rt = "0.7.5"
+defmt = "1"
+defmt-rtt = {  version = "1", optional = true }
+#defmt-semihosting = { version = "0.3.0", optional = true }
 panic-probe = { version = "1.0.0", features = ["print-defmt"] }
-defmt = "1.0.1"
-defmt-rtt = "1.0.0"
 
 embassy-executor = { version = "0.9.1", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
 embassy-time = { version = "0.5.0", features = ["defmt", "defmt-timestamp-uptime"] }
@@ -25,9 +31,7 @@ lto = true
 codegen-units = 1
 opt-level = "s"
 strip = "symbols"
-
-[features]
-default = []
+panic = "abort"
 
 [package.metadata.skju_sn]
 build = [

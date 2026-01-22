@@ -1,6 +1,6 @@
-mpu6500_mock: Python.PythonPeripheral @ sysbus 0x70000000
-    size: 0x10
-    initable: false
-    filename: /app/scripts/mpu6500_mock.py
+// Instantiate your C# Mpu6500 peripheral and connect it to the spi2 controller
+mpu6500: Antmicro.Renode.Peripherals.Sensors.Mpu6500 @ spi2
 
-connector Connect @nrf52840dk.nrf52840.spi2 mpu6500_mock
+// Connect Chip Select (CS) pin P0.30
+// gpio0:
+//    30 -> mpu6500@0
