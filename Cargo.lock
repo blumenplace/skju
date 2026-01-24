@@ -1742,6 +1742,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "skju_peripherals"
+version = "0.1.0"
+
+[[package]]
 name = "skju_server"
 version = "0.1.0"
 dependencies = [
