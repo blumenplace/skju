@@ -1,7 +1,8 @@
-pub mod accel;
+mod accel;
 mod builder;
-pub mod fifo;
-pub mod registers;
+mod fifo;
+mod gyro;
+mod registers;
 
 use crate::bus::Bus;
 use core::future::Future;
