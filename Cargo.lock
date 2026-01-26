@@ -1744,6 +1744,9 @@ dependencies = [
 [[package]]
 name = "skju_peripherals"
 version = "0.1.0"
+dependencies = [
+ "bitflags",
+]
 
 [[package]]
 name = "skju_server"
