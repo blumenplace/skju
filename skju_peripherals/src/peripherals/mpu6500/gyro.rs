@@ -34,25 +34,15 @@ impl GyroConfig {
     }
 
     pub fn bits(&self) -> u8 {
-        self.st_flags.bits() | (self.range.bits() << 3)
+        self.st_flags.bits() | ((self.range as u8) << 3)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum GyroRange {
-    R250dps,
-    R500dps,
-    R1000dps,
-    R2000dps,
-}
-
-impl GyroRange {
-    fn bits(self) -> u8 {
-        match self {
-            GyroRange::R250dps => 0b00,
-            GyroRange::R500dps => 0b01,
-            GyroRange::R1000dps => 0b10,
-            GyroRange::R2000dps => 0b11,
-        }
-    }
+    R250dps = 0b00,
+    R500dps = 0b01,
+    R1000dps = 0b10,
+    R2000dps = 0b11,
 }

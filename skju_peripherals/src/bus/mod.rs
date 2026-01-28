@@ -1,6 +1,6 @@
 use core::future::Future;
 
-pub trait Bus {
-    fn read(self: &mut Self, register: u8) -> impl Future<Output = u8>;
-    fn write(self: &mut Self, register: u8, value: u8) -> impl Future<Output = ()>;
+pub trait Bus {    
+    fn send(&mut self, bytes_to_send: &[u8]) -> impl Future<Output = ()>;
+    fn send_then_read(&mut self, bytes_to_send: &[u8], read_into: &mut[u8]) -> impl Future<Output = ()>;
 }
