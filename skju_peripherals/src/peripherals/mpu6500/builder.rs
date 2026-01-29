@@ -3,7 +3,7 @@ use crate::peripherals::mpu6500::accel::AccelConfig;
 use crate::peripherals::mpu6500::config::Config;
 use crate::peripherals::mpu6500::fifo::{FIFOConfig, FIFOLayout, FIFOMode};
 use crate::peripherals::mpu6500::gyro::GyroConfig;
-use crate::peripherals::mpu6500::int::INTConfig;
+use crate::peripherals::mpu6500::interrupts::INTConfig;
 use crate::peripherals::mpu6500::registers::*;
 use crate::peripherals::mpu6500::user_control::UserControlConfig;
 use core::option::Option;

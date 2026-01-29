@@ -82,10 +82,10 @@ impl FIFOLayout {
                 .push(FIFOEntry::new(FIFOEntryType::AccelX, offset))
                 .expect(&error_message);
             fields
-                .push(FIFOEntry::new(FIFOEntryType::AccelY, offset))
+                .push(FIFOEntry::new(FIFOEntryType::AccelY, offset + 2))
                 .expect(&error_message);
             fields
-                .push(FIFOEntry::new(FIFOEntryType::AccelZ, offset))
+                .push(FIFOEntry::new(FIFOEntryType::AccelZ, offset + 4))
                 .expect(&error_message);
             offset += 6;
         }

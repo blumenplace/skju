@@ -3,7 +3,7 @@ mod builder;
 mod config;
 mod fifo;
 mod gyro;
-mod int;
+mod interrupts;
 mod registers;
 mod user_control;
 
