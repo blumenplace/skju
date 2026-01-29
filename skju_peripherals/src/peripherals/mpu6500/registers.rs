@@ -6,6 +6,8 @@ pub const ACCEL_CONFIG: u8 = 0x1C;
 pub const ACCEL_CONFIG_2: u8 = 0x1D;
 pub const FIFO_EN: u8 = 0x23;
 pub const USER_CTRL: u8 = 0x6A;
+pub const INT_PIN_CFG: u8 = 0x37;
+pub const INT_ENABLE: u8 = 0x38;
 
 // READS
 pub const ACCEL_XOUT_H: u8 = 0x3B; // [15:8]
@@ -23,3 +25,4 @@ pub const GYRO_ZOUT_L: u8 = 0x48; // [7:0]
 pub const FIFO_COUNT_H: u8 = 0x72; // [12:8]
 pub const FIFO_COUNT_L: u8 = 0x73; // [7:0]
 pub const FIFO_R_W: u8 = 0x74;
+pub const INT_STATUS: u8 = 0x3A;

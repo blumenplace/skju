@@ -1,23 +1,27 @@
 mod accel;
 mod builder;
+mod config;
 mod fifo;
 mod gyro;
+mod int;
 mod registers;
 mod user_control;
 
 use crate::bus::Bus;
-use core::option::Option::{None};
 use crate::peripherals::mpu6500::fifo::FIFOLayout;
 use builder::*;
+use core::option::Option::None;
 use registers::*;
 
 impl<T: Bus> MPU6500<T> {
     pub fn builder() -> MPU6500Builder<NoBus> {
         MPU6500Builder {
             bus: NoBus,
+            config: None,
+            int_config: None,
+            fifo_config: None,
             gyro_config: None,
             accel_config: None,
-            fifo_config: None,
             user_ctrl_config: None,
         }
     }
@@ -63,20 +67,18 @@ impl<T: Bus> MPU6500<T> {
         let address = FIFO_EN | 0x80;
         let mut read_into = [0];
 
-        self.bus
-            .send_then_read(&[address], &mut read_into)
-            .await;
+        self.bus.send_then_read(&[address], &mut read_into).await;
 
         let fifo_layout = FIFOLayout::from_fifo_register(read_into[0]);
 
         fifo_layout
     }
-    
+
     // Do we need to handle a case where the total count changes before draining the fifo?
     pub async fn total_fifo_bytes(&mut self) -> u16 {
         let fifo_layout = self.fifo_layout().await;
         let fifo_sample_count = self.fifo_sample_count().await;
-        
+
         fifo_sample_count * fifo_layout.size as u16
     }
 
