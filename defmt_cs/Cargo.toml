@@ -1,0 +1,15 @@
+[package]
+name = "defmt_cs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+thiserror = "2"
+defmt-decoder = "1"
+uniffi = { version = "0.31", features = [ "build", "bindgen" ] }
+
+[build-dependencies]
+uniffi = { version = "0.31", features = [ "build", "bindgen" ] }
