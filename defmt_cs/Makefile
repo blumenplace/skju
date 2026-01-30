@@ -20,12 +20,12 @@ TARGET_LIB:=target/$(BUILD)/$(LIB_PREFIX)defmt_cs.$(LIB_EXT)
 
 .PHONY: clean
 
-all: TARGET_LIB bindings/defmt_cs.cs
+all: $(TARGET_LIB) bindings/defmt_cs.cs
 
-TARGET_LIB:
+$(TARGET_LIB): src/lib.rs Cargo.toml
 	@cargo build $(BUILD_PARAMS)
 
-bindings/defmt_cs.cs:
+bindings/defmt_cs.cs: $(TARGET_LIB)
 	@uniffi-bindgen-cs --library $(TARGET_LIB) --out-dir ./bindings
 
 clean:
