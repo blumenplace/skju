@@ -6,7 +6,7 @@ use uniffi::deps::anyhow;
 #[derive(Debug, thiserror::Error, uniffi::Object)]
 #[error(transparent)]
 #[uniffi::export(Debug, Display)]
-pub struct DefmtError {
+struct DefmtError {
     #[from]
     error: DefmtInnerError,
 }
@@ -36,7 +36,7 @@ struct DefmtDecoder {
 #[uniffi::export]
 impl DefmtDecoder {
     #[uniffi::constructor]
-    fn new(elf_path: String) -> Result<Self> {
+    pub fn new(elf_path: String) -> Result<Self> {
         let bytes = fs::read(&elf_path).map_err(DefmtInnerError::from)?;
         let table = Table::parse(&bytes)
             .map_err(DefmtInnerError::from)?
@@ -45,7 +45,7 @@ impl DefmtDecoder {
     }
 
     #[uniffi::method(name = "DecodeFrame")]
-    fn decode_frame(&self, data: &[u8]) -> Result<String> {
+    pub fn decode_frame(&self, data: &[u8]) -> Result<String> {
         let table_lock = self
             .table
             .lock()

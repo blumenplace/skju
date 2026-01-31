@@ -16,7 +16,7 @@ sysbus LoadELF $FIRMWARE_PATH
 
 include @/workspace/scripts/DefmtPlugin.cs
 plugins EnablePlugin "defmt"
-defmt_setup
+defmt_setup $FIRMWARE_PATH
 
 # sysbus.cpu LogSemihosting true
 # start

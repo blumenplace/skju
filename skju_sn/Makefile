@@ -39,6 +39,19 @@ renode: renode-img build
 	  skju-renode:latest \
 	  renode --disable-gui --console -e 'set FIRMWARE_PATH "/workspace/$(FIRMWARE_PATH)"; start @/workspace/scripts/nrf52840dk.resc'
 
+
+new-renode: build
+	@$(CONTAINER) run -it --rm \
+	  -v "$(PWD)":/workspace \
+	  -w /workspace \
+	  -e FIRMWARE_PATH?="/workspace/$(FIRMWARE_PATH)" \
+	  -p 3333:3333 \
+	  -p 19021:19021 \
+	  -e LD_PRELOAD=/opt/renode/defmt_cs.so \
+	  renode-skju:latest \
+	  renode --disable-gui --console -e 'set FIRMWARE_PATH "/workspace/$(FIRMWARE_PATH)"; start @/workspace/scripts/nrf52840dk.resc'
+
+
 logs:
 	@defmt-print -e ${FIRMWARE_PATH} tcp --host localhost --port 19021
 
