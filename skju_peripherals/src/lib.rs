@@ -1,5 +1,6 @@
 #![no_std]
-extern crate alloc;
 
 pub mod bus;
-pub mod peripherals;
+mod peripherals;
+
+pub use peripherals::*;

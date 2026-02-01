@@ -1,4 +1,11 @@
+use core::clone::Clone;
+use core::fmt::Debug;
+use core::marker::Copy;
+
+pub const MAX_FIFO_BUFFER_SIZE: usize = 512;
+
 bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy)]
     pub struct FIFOSensors : u8 {
         const TEMP = 1 << 7;
         const GYRO_X = 1 << 6;

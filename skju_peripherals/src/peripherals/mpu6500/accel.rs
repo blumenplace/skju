@@ -28,7 +28,7 @@ impl AccelConfig {
         self
     }
 
-    pub fn flags(mut self, flags: SelfTestFlags) -> Self {
+    pub fn self_test_flags(mut self, flags: SelfTestFlags) -> Self {
         self.st_flags = flags;
         self
     }

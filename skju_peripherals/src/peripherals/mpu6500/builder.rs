@@ -1,28 +1,27 @@
 use crate::bus::Bus;
 use crate::peripherals::mpu6500::accel::AccelConfig;
-use crate::peripherals::mpu6500::config::Config;
+use crate::peripherals::mpu6500::config::MPU6500Config;
 use crate::peripherals::mpu6500::fifo::{FIFOConfig, FIFOLayout, FIFOMode};
 use crate::peripherals::mpu6500::gyro::GyroConfig;
 use crate::peripherals::mpu6500::interrupts::INTConfig;
+use crate::peripherals::mpu6500::mpu6500::MPU6500;
+use crate::peripherals::mpu6500::power_management::PowerManagementConfig;
 use crate::peripherals::mpu6500::registers::*;
 use crate::peripherals::mpu6500::user_control::UserControlConfig;
-use core::option::Option;
-
-pub struct MPU6500<T: Bus> {
-    pub bus: T,
-}
+use crate::peripherals::mpu6500::utils::WRITE_MASK;
 
 pub struct NoBus;
 pub struct WithBus<T: Bus>(T);
 
 pub struct MPU6500Builder<B> {
     pub bus: B,
-    pub config: Option<Config>,
+    pub config: Option<MPU6500Config>,
     pub accel_config: Option<AccelConfig>,
     pub gyro_config: Option<GyroConfig>,
     pub fifo_config: Option<FIFOConfig>,
     pub user_ctrl_config: Option<UserControlConfig>,
     pub int_config: Option<INTConfig>,
+    pub power_management_config: Option<PowerManagementConfig>,
 }
 
 impl MPU6500Builder<NoBus> {
@@ -35,12 +34,13 @@ impl MPU6500Builder<NoBus> {
             fifo_config: self.fifo_config,
             user_ctrl_config: self.user_ctrl_config,
             int_config: self.int_config,
+            power_management_config: self.power_management_config,
         }
     }
 }
 
 impl<B> MPU6500Builder<B> {
-    pub fn with_config(mut self, config: Config) -> MPU6500Builder<B> {
+    pub fn with_config(mut self, config: MPU6500Config) -> MPU6500Builder<B> {
         self.config = Some(config);
         self
     }
@@ -69,6 +69,11 @@ impl<B> MPU6500Builder<B> {
         self.int_config = Some(config);
         self
     }
+
+    pub fn with_power_management_config(mut self, config: PowerManagementConfig) -> MPU6500Builder<B> {
+        self.power_management_config = Some(config);
+        self
+    }
 }
 
 impl<T: Bus> MPU6500Builder<WithBus<T>> {
@@ -76,27 +81,27 @@ impl<T: Bus> MPU6500Builder<WithBus<T>> {
         let mut bus = self.bus.0;
         let fifo_enabled = self.fifo_config.is_some();
         let config_register_byte = encode_config_register(&self.config, &self.fifo_config);
-        let config_bytes_to_send = [for_write(CONFIG), config_register_byte];
+        let config_bytes_to_send = [CONFIG | WRITE_MASK, config_register_byte];
 
         bus.send(&config_bytes_to_send).await;
 
         if let Some(config) = self.fifo_config {
             let fifo_en_register_byte = encode_fifo_en_register(&config);
-            let bytes_to_send = [for_write(FIFO_EN), fifo_en_register_byte];
+            let bytes_to_send = [FIFO_EN | WRITE_MASK, fifo_en_register_byte];
 
             bus.send(&bytes_to_send).await;
         }
 
         if let Some(accel_config) = self.accel_config {
             let accel_bytes = encode_accel_registers(&accel_config);
-            let bytes_to_send = [for_write(ACCEL_CONFIG), accel_bytes[0], accel_bytes[1]];
+            let bytes_to_send = [ACCEL_CONFIG | WRITE_MASK, accel_bytes[0], accel_bytes[1]];
 
             bus.send(&bytes_to_send).await;
         }
 
         if let Some(gyro_config) = self.gyro_config {
             let gyro_config_byte = encode_gyro_register(&gyro_config);
-            let bytes_to_send = [for_write(GYRO_CONFIG), gyro_config_byte];
+            let bytes_to_send = [GYRO_CONFIG | WRITE_MASK, gyro_config_byte];
 
             bus.send(&bytes_to_send).await;
         }
@@ -107,23 +112,34 @@ impl<T: Bus> MPU6500Builder<WithBus<T>> {
             }
 
             let user_ctrl_config_byte = encode_user_ctrl_register(&user_ctrl_config);
-            let bytes_to_send = [for_write(USER_CTRL), user_ctrl_config_byte];
+            let bytes_to_send = [USER_CTRL | WRITE_MASK, user_ctrl_config_byte];
 
             bus.send(&bytes_to_send).await;
         }
 
         if let Some(int_config) = self.int_config {
             let int_cfg_bytes = encode_int_cfg_registers(&int_config);
-            let bytes_to_send = [for_write(INT_PIN_CFG), int_cfg_bytes[0], int_cfg_bytes[1]];
+            let bytes_to_send = [INT_PIN_CFG | WRITE_MASK, int_cfg_bytes[0], int_cfg_bytes[1]];
 
             bus.send(&bytes_to_send).await;
         }
 
-        MPU6500 { bus }
+        if let Some(power_management_config) = self.power_management_config {
+            let power_management_bytes = encode_power_management_registers(&power_management_config);
+            let bytes_to_send = [
+                PWR_MGMT_1 | WRITE_MASK,
+                power_management_bytes[0],
+                power_management_bytes[1],
+            ];
+
+            bus.send(&bytes_to_send).await;
+        }
+
+        MPU6500 { bus, latest_interrupts: 0 }
     }
 }
 
-fn encode_config_register(config: &Option<Config>, fifo_config: &Option<FIFOConfig>) -> u8 {
+fn encode_config_register(config: &Option<MPU6500Config>, fifo_config: &Option<FIFOConfig>) -> u8 {
     let mut register_byte = 0;
 
     if let Some(config) = config {
@@ -139,12 +155,6 @@ fn encode_config_register(config: &Option<Config>, fifo_config: &Option<FIFOConf
     register_byte
 }
 
-fn for_write(register: u8) -> u8 {
-    register | 0x7F
-}
-fn for_read(register: u8) -> u8 {
-    register & 0x80
-}
 fn encode_fifo_en_register(fifo_config: &FIFOConfig) -> u8 {
     fifo_config.sensors.bits()
 }
@@ -159,4 +169,7 @@ fn encode_user_ctrl_register(user_ctrl_config: &UserControlConfig) -> u8 {
 }
 fn encode_int_cfg_registers(int_config: &INTConfig) -> [u8; 2] {
     int_config.bits()
+}
+fn encode_power_management_registers(power_management_config: &PowerManagementConfig) -> [u8; 2] {
+    power_management_config.bits()
 }

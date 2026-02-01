@@ -1,10 +1,10 @@
 #[derive(Debug, Clone, Copy)]
-pub struct Config {
+pub struct MPU6500Config {
     pub ext_sync: ExtSyncOptions,
     pub dlpf_cfg: DLPFOptions,
 }
 
-impl Default for Config {
+impl Default for MPU6500Config {
     fn default() -> Self {
         Self {
             ext_sync: ExtSyncOptions::Disabled,
@@ -13,7 +13,7 @@ impl Default for Config {
     }
 }
 
-impl Config {
+impl MPU6500Config {
     pub fn ext_sync(mut self, ext_sync: ExtSyncOptions) -> Self {
         self.ext_sync = ext_sync;
         self

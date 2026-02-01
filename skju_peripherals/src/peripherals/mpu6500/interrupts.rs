@@ -21,6 +21,17 @@ bitflags::bitflags! {
     }
 }
 
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy)]
+    pub struct InterruptStatus: u8 {
+        const WOM_INT = 1 << 6;
+        const FIFO_OVERFLOW_INT = 1 << 4;
+        const FSYNC_INT = 1 << 3;
+        const DMP_INT = 1 << 1;
+        const RAW_DATA_RDY_INT = 1 << 0;
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct INTConfig {
     pub int_flags: INTFlags,

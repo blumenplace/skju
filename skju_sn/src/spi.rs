@@ -17,24 +17,19 @@ impl SpiDeviceBus {
 }
 
 impl Bus for SpiDeviceBus {
-    async fn read(self: &mut Self, register: u8) -> u8 {
-        let mut read = [register];
+    async fn send(&mut self, bytes_to_send: &[u8]) {
         let mut spi_guard = self.spi.lock().await;
 
         self.cs.set_low();
-        spi_guard.write(&mut read).await.unwrap();
-        spi_guard.read(&mut read).await.unwrap();
+        spi_guard.write(bytes_to_send).await.unwrap();
         self.cs.set_high();
-
-        read[0]
     }
 
-    async fn write(self: &mut Self, register: u8, value: u8) {
-        let mut write = [register, value];
+    async fn send_then_read(&mut self, bytes_to_send: &[u8], buffer: &mut [u8]) {
         let mut spi_guard = self.spi.lock().await;
 
         self.cs.set_low();
-        spi_guard.write(&mut write).await.unwrap();
+        spi_guard.transfer(buffer, bytes_to_send).await.unwrap();
         self.cs.set_high();
     }
 }
