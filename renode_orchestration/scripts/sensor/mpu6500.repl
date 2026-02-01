@@ -1,6 +1,0 @@
-mpu6500_mock: Python.PythonPeripheral @ sysbus 0x70000000
-    size: 0x10
-    initable: false
-    filename: /app/scripts/sensor/mpu6500_mock.py
-
-connector Connect @nrf52840dk.nrf52840.spi2 mpu6500_mock

@@ -1,1 +1,0 @@
-sysbus LoadELF $GATEWAY_FIRMWARE_PATH
