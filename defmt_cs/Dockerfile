@@ -54,12 +54,6 @@ RUN cargo install uniffi-bindgen-cs --git https://github.com/NordSecurity/uniffi
 
 WORKDIR /build
 
-#COPY Cargo.toml ./
-#RUN mkdir -p src && printf "pub fn _dummy() {}\n" > src/lib.rs
-#RUN --mount=type=cache,target=/root/.cargo/registry \
-#    --mount=type=cache,target=/root/.cargo/git \
-#    cargo build --release
-
 COPY . .
 RUN make all BUILD=debug
 RUN mkdir -p out

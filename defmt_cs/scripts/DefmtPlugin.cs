@@ -27,7 +27,7 @@ namespace Antmicro.Renode.BlumenPlace
     {
         public DefmtPlugin(Monitor monitor)
         {
-            Logger.Log(LogLevel.Info, "Defmt plugin loaded, registering 'defmt_setup' command...");
+            Logger.Log(LogLevel.Info, "[defmt] Defmt plugin loaded, registering 'defmt_setup' command...");
             this.monitor = monitor;
             defmtSetupCommand = new DefmtSetupCommand(monitor);
             monitor.RegisterCommand(defmtSetupCommand);
@@ -83,11 +83,10 @@ namespace Antmicro.Renode.BlumenPlace
 
         private void Execute(ICommandInteraction writer, string elfPath, IMachine machine)
         {
-            Logger.Log(LogLevel.Debug, "Defmt plugin: using ELF @ {0}", elfPath);
-            Logger.Log(LogLevel.Debug, "Reading SEGGER RTT location");
+            Logger.Log(LogLevel.Debug, "[defmt] Reading SEGGER RTT location");
             var seggerAddress = machine.SystemBus.GetSymbolAddress(SeggerBuffer.SEGGER_RTT);
 
-            Logger.Log(LogLevel.Debug, "Initialize Defmt Decoder");
+            Logger.Log(LogLevel.Debug, "[defmt] Initializing decoder");
             dynamic defmtDecoder = CreateDecoder("/opt/renode/DefmtBindings.dll", elfPath);
 
             var seggerBufferLock = new object();
@@ -105,11 +104,13 @@ namespace Antmicro.Renode.BlumenPlace
                 }
 
                 if (data.Length > 0) {
-                    Logger.Log(LogLevel.Debug, "defmt: {0}", BitConverter.ToString(data));
                     try {
-                        Logger.Log(LogLevel.Info, "defmt: {0}", defmtDecoder.DecodeFrame(data));
+                        var logMessage = defmtDecoder.DecodeFrame(data);
+                        if (logMessage != null) {
+                            Logger.Log(LogLevel.Info, "[defmt] {0}", logMessage);
+                        }
                     } catch (Exception e) {
-                        Logger.Log(LogLevel.Error, e.ToString());
+                        Logger.Log(LogLevel.Error, "[defmt] {0}", e.ToString());
                         throw;
                     }
                     Broadcast(data);
@@ -172,7 +173,7 @@ namespace Antmicro.Renode.BlumenPlace
                 byte[] frameData = new byte[0];
                 if (readValue == writeValue) return frameData;
 
-                Logger.Log(LogLevel.Debug, "Reading r:{0} w:{1} bytes from defmt buffer", readValue, writeValue);
+                Logger.Log(LogLevel.Debug, "[defmt] Reading r:{0} w:{1} bytes from defmt buffer", readValue, writeValue);
 
                 if (writeValue >= readValue) {
                     var length = writeValue - readValue;
@@ -200,10 +201,10 @@ namespace Antmicro.Renode.BlumenPlace
 
         private void StartServer(int port = 19021)
         {
-            Logger.Log(LogLevel.Debug, "Starting defmt TCP server on port {0}", port);
+            Logger.Log(LogLevel.Debug, "[defmt] Starting defmt TCP server on port {0}", port);
 
             if (isRunning) {
-                Logger.Log(LogLevel.Debug, "The defmt TCP is already running on port {0}", port);
+                Logger.Log(LogLevel.Debug, "[defmt] The defmt TCP is already running on port {0}", port);
                 return;
             }
 
@@ -215,29 +216,29 @@ namespace Antmicro.Renode.BlumenPlace
                 var serverThread = new System.Threading.Thread(() => {
                     while (isRunning) {
                         try {
-                            Logger.Log(LogLevel.Info, "defmt TCP servier is waiting for connections...");
+                            Logger.Log(LogLevel.Info, "[defmt] defmt TCP servier is waiting for connections...");
                             var client = listener.AcceptTcpClient();
-                            Logger.Log(LogLevel.Info, "A client {0} has connected to defmt TCP server", client.Client.RemoteEndPoint);
+                            Logger.Log(LogLevel.Info, "[defmt] A client {0} has connected to defmt TCP server", client.Client.RemoteEndPoint);
                             lock (clientsLock) {
                                 clients.Add(client);
                             }
-                            Logger.Log(LogLevel.Info, "defmt: Client connected from {0}", client.Client.RemoteEndPoint);
+                            Logger.Log(LogLevel.Info, "[defmt] Client connected from {0}", client.Client.RemoteEndPoint);
                         } catch {
                             if (isRunning) throw;
                         }
                     }
                 }) { IsBackground = true };
                 serverThread.Start();
-                Logger.Log(LogLevel.Info, "defmt TCP server started on port {0}", port);
+                Logger.Log(LogLevel.Info, "[defmt] TCP server started on port {0}", port);
             } catch (Exception e) {
-                Logger.Log(LogLevel.Error, "Failed to start Defmt TCP server: {0}", e.Message);
+                Logger.Log(LogLevel.Error, "[defmt] Failed to start Defmt TCP server: {0}", e.Message);
             }
         }
 
         private void Broadcast(byte[] data)
         {
             lock (clientsLock) {
-                Logger.Log(LogLevel.Debug, "Broadcasting {0} bytes to defmt TCP clients {1}", data.Length, clients.Count);
+                Logger.Log(LogLevel.Debug, "[defmt] Broadcasting {0} bytes to defmt TCP clients {1}", data.Length, clients.Count);
                 for (int i = clients.Count - 1; i >= 0; i--) {
                     try {
                         var stream = clients[i].GetStream();
