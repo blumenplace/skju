@@ -26,17 +26,14 @@ fmt:
 build: deny fmt
 	@DEFMT_LOG=trace cargo build
 
-renode-img:
-	@$(CONTAINER) build --platform $(RENODE_PLATFORM) --build-arg RENODE_VERSION=$(RENODE_VERSION) --build-arg RENODE_PKG=$(RENODE_PKG) -t skju-renode -f Dockerfile.renode .
-
-renode: renode-img build
+renode: build
 	@$(CONTAINER) run -it --rm \
 	  -v "$(PWD)":/workspace \
 	  -w /workspace \
 	  -e FIRMWARE_PATH?="/workspace/$(FIRMWARE_PATH)" \
 	  -p 3333:3333 \
 	  -p 19021:19021 \
-	  skju-renode:latest \
+	  renode-skju:latest \
 	  renode --disable-gui --console -e 'set FIRMWARE_PATH "/workspace/$(FIRMWARE_PATH)"; start @/workspace/scripts/nrf52840dk.resc'
 
 logs:
