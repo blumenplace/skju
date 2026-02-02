@@ -14,9 +14,9 @@ sysbus LoadELF $FIRMWARE_PATH
 # sysbus LogPeripheralAccess <peripheral-name> true
 # sysbus LogAllPeripheralsAccess true
 
-include @/workspace/scripts/DefmtPlugin.cs
+include @scripts/blumenplace/DefmtPlugin.cs
 plugins EnablePlugin "defmt"
-defmt_setup
+defmt_setup $FIRMWARE_PATH
 
 # sysbus.cpu LogSemihosting true
 # start

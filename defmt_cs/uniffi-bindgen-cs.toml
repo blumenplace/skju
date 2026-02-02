@@ -1,0 +1,3 @@
+[bindings.csharp]
+namespace = "Antmicro.Renode.BlumenPlace"
+access_modifier = "public"
