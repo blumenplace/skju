@@ -10,6 +10,7 @@ pub const INT_PIN_CFG: u8 = 0x37;
 pub const INT_ENABLE: u8 = 0x38;
 pub const PWR_MGMT_1: u8 = 0x6B;
 pub const PWR_MGMT_2: u8 = 0x6C;
+pub const SIGNAL_PATH_RESET: u8 = 0x68;
 
 // READS
 pub const ACCEL_XOUT_H: u8 = 0x3B; // [15:8]

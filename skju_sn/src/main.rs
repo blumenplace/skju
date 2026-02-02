@@ -5,6 +5,7 @@
 #![no_main]
 
 mod spi;
+mod timer;
 
 #[cfg(feature = "rtt")]
 use defmt_rtt as _;
@@ -24,6 +25,7 @@ use skju_peripherals::mpu6500::interrupts::{INTConfig, INTEnableFlags, INTFlags,
 use skju_peripherals::mpu6500::registers::WHO_AM_I;
 
 use crate::spi::SpiDeviceBus;
+use crate::timer::TimerHandler;
 
 bind_interrupts!(struct Irqs {
     SPI2 => spim::InterruptHandler<peripherals::SPI2>;
@@ -39,8 +41,9 @@ async fn main(spawner: Spawner) {
     let spi_bus = SpiDeviceBus::new(spim, mpu_cs);
     let mpu_int: Input = Input::new(p.P0_31, Pull::Down);
     let fifo_sensors = FIFOSensors::GYRO_X | FIFOSensors::GYRO_Y | FIFOSensors::GYRO_Z | FIFOSensors::ACCEL;
-    let mpu6500 = MPU6500::<SpiDeviceBus>::builder()
+    let mpu6500 = MPU6500::<SpiDeviceBus, TimerHandler>::builder()
         .with_bus(spi_bus)
+        .with_timer(TimerHandler)
         .with_config(MPU6500Config::default())
         .with_accel_config(AccelConfig::default())
         .with_gyro_config(GyroConfig::default())
@@ -61,7 +64,7 @@ async fn main(spawner: Spawner) {
 }
 
 #[embassy_executor::task]
-async fn handle_mpu_interrupts(mut mpu6500: MPU6500<SpiDeviceBus>, mut int_pin: Input<'static>) {
+async fn handle_mpu_interrupts(mut mpu6500: MPU6500<SpiDeviceBus, TimerHandler>, mut int_pin: Input<'static>) {
     loop {
         int_pin.wait_for_low().await;
         mpu6500.set_interrupt_status().await;
@@ -82,7 +85,7 @@ async fn handle_mpu_interrupts(mut mpu6500: MPU6500<SpiDeviceBus>, mut int_pin: 
 }
 
 #[embassy_executor::task]
-async fn test_mpu_connection(mut mpu6500: MPU6500<SpiDeviceBus>) {
+async fn test_mpu_connection(mut mpu6500: MPU6500<SpiDeviceBus, TimerHandler>) {
     loop {
         let device_id = mpu6500.read_register(WHO_AM_I).await;
 

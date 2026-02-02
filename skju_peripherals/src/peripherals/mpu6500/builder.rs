@@ -9,12 +9,17 @@ use crate::peripherals::mpu6500::power_management::PowerManagementConfig;
 use crate::peripherals::mpu6500::registers::*;
 use crate::peripherals::mpu6500::user_control::UserControlConfig;
 use crate::peripherals::mpu6500::utils::WRITE_MASK;
+use crate::timer::Timer;
 
 pub struct NoBus;
-pub struct WithBus<T: Bus>(T);
+pub struct WithBus<B: Bus>(B);
 
-pub struct MPU6500Builder<B> {
+pub struct NoTimer;
+pub struct WithTimer<T: Timer>(T);
+
+pub struct MPU6500Builder<B, T> {
     pub bus: B,
+    pub timer: T,
     pub config: Option<MPU6500Config>,
     pub accel_config: Option<AccelConfig>,
     pub gyro_config: Option<GyroConfig>,
@@ -24,10 +29,11 @@ pub struct MPU6500Builder<B> {
     pub power_management_config: Option<PowerManagementConfig>,
 }
 
-impl MPU6500Builder<NoBus> {
-    pub fn with_bus<B: Bus>(self, bus: B) -> MPU6500Builder<WithBus<B>> {
+impl<T> MPU6500Builder<NoBus, T> {
+    pub fn with_bus<B: Bus>(self, bus: B) -> MPU6500Builder<WithBus<B>, T> {
         MPU6500Builder {
             bus: WithBus(bus),
+            timer: self.timer,
             config: self.config,
             gyro_config: self.gyro_config,
             accel_config: self.accel_config,
@@ -39,46 +45,63 @@ impl MPU6500Builder<NoBus> {
     }
 }
 
-impl<B> MPU6500Builder<B> {
-    pub fn with_config(mut self, config: MPU6500Config) -> MPU6500Builder<B> {
+impl<B> MPU6500Builder<B, NoTimer> {
+    pub fn with_timer<T: Timer>(self, timer: T) -> MPU6500Builder<B, WithTimer<T>> {
+        MPU6500Builder {
+            bus: self.bus,
+            timer: WithTimer(timer),
+            config: self.config,
+            gyro_config: self.gyro_config,
+            accel_config: self.accel_config,
+            fifo_config: self.fifo_config,
+            user_ctrl_config: self.user_ctrl_config,
+            int_config: self.int_config,
+            power_management_config: self.power_management_config,
+        }
+    }
+}
+
+impl<B, T> MPU6500Builder<B, T> {
+    pub fn with_config(mut self, config: MPU6500Config) -> MPU6500Builder<B, T> {
         self.config = Some(config);
         self
     }
 
-    pub fn with_gyro_config(mut self, config: GyroConfig) -> MPU6500Builder<B> {
+    pub fn with_gyro_config(mut self, config: GyroConfig) -> MPU6500Builder<B, T> {
         self.gyro_config = Some(config);
         self
     }
 
-    pub fn with_accel_config(mut self, config: AccelConfig) -> MPU6500Builder<B> {
+    pub fn with_accel_config(mut self, config: AccelConfig) -> MPU6500Builder<B, T> {
         self.accel_config = Some(config);
         self
     }
 
-    pub fn with_fifo_config(mut self, config: FIFOConfig) -> MPU6500Builder<B> {
+    pub fn with_fifo_config(mut self, config: FIFOConfig) -> MPU6500Builder<B, T> {
         self.fifo_config = Some(config);
         self
     }
 
-    pub fn with_user_ctrl_config(mut self, config: UserControlConfig) -> MPU6500Builder<B> {
+    pub fn with_user_ctrl_config(mut self, config: UserControlConfig) -> MPU6500Builder<B, T> {
         self.user_ctrl_config = Some(config);
         self
     }
 
-    pub fn with_int_config(mut self, config: INTConfig) -> MPU6500Builder<B> {
+    pub fn with_int_config(mut self, config: INTConfig) -> MPU6500Builder<B, T> {
         self.int_config = Some(config);
         self
     }
 
-    pub fn with_power_management_config(mut self, config: PowerManagementConfig) -> MPU6500Builder<B> {
+    pub fn with_power_management_config(mut self, config: PowerManagementConfig) -> MPU6500Builder<B, T> {
         self.power_management_config = Some(config);
         self
     }
 }
 
-impl<T: Bus> MPU6500Builder<WithBus<T>> {
-    pub async fn build(self) -> MPU6500<T> {
+impl<T: Bus, U: Timer> MPU6500Builder<WithBus<T>, WithTimer<U>> {
+    pub async fn build(self) -> MPU6500<T, U> {
         let mut bus = self.bus.0;
+        let timer = self.timer.0;
         let fifo_enabled = self.fifo_config.is_some();
         let config_register_byte = encode_config_register(&self.config, &self.fifo_config);
         let config_bytes_to_send = [CONFIG | WRITE_MASK, config_register_byte];
@@ -135,7 +158,7 @@ impl<T: Bus> MPU6500Builder<WithBus<T>> {
             bus.send(&bytes_to_send).await;
         }
 
-        MPU6500 { bus, latest_interrupts: 0 }
+        MPU6500 { bus, timer, latest_interrupts: 0 }
     }
 }
 

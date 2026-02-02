@@ -1,4 +1,6 @@
 use crate::bus::Bus;
+use crate::mpu6500::builder::NoTimer;
+use crate::mpu6500::registers::SIGNAL_PATH_RESET;
 use crate::peripherals::mpu6500::builder::{MPU6500Builder, NoBus};
 use crate::peripherals::mpu6500::fifo::FIFOLayout;
 use crate::peripherals::mpu6500::interrupts::InterruptStatus;
@@ -6,16 +8,19 @@ use crate::peripherals::mpu6500::registers::{
     ACCEL_XOUT_H, FIFO_COUNT_H, FIFO_EN, FIFO_R_W, GYRO_XOUT_H, INT_STATUS, PWR_MGMT_1, PWR_MGMT_2,
 };
 use crate::peripherals::mpu6500::utils::{READ_MASK, WRITE_MASK};
+use crate::timer::Timer;
 
-pub struct MPU6500<T: Bus> {
+pub struct MPU6500<T: Bus, U: Timer> {
     pub bus: T,
+    pub timer: U,
     pub(crate) latest_interrupts: u8,
 }
 
-impl<T: Bus> MPU6500<T> {
-    pub fn builder() -> MPU6500Builder<NoBus> {
+impl<T: Bus, U: Timer> MPU6500<T, U> {
+    pub fn builder() -> MPU6500Builder<NoBus, NoTimer> {
         MPU6500Builder {
             bus: NoBus,
+            timer: NoTimer,
             config: None,
             int_config: None,
             fifo_config: None,
@@ -52,7 +57,7 @@ impl<T: Bus> MPU6500<T> {
         let mask = status.bits();
         let result = self.latest_interrupts & mask != 0;
 
-        // Claer status bit to mark it as processed
+        // Clear status bit to mark it as processed
         self.latest_interrupts &= !mask;
 
         result
@@ -129,11 +134,15 @@ impl<T: Bus> MPU6500<T> {
         total_count
     }
 
-    // TODO: Handle the case where we are resetting via SPI
-    // SPI reset should include 100ms pause and separate reset for each sensor (gyro, accel, temp)
     pub async fn reset_device(&mut self) {
         let reset_bit = 1 << 7;
+        let partial_reset = 1 << 2 | 1 << 1 | 1 << 0;
+        let partial_reset_address = SIGNAL_PATH_RESET | WRITE_MASK;
+
         self.set_power_mng_1_bit(reset_bit, false).await;
+        self.timer.wait_ms(100).await;
+        self.bus.send(&[partial_reset_address, partial_reset]).await;
+        self.timer.wait_ms(100).await;
     }
 
     pub async fn set_sleep_mode(&mut self, sleep: bool) {
