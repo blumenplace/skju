@@ -1,4 +1,4 @@
-FROM ubuntu:24.04 as RENODE_BASE
+FROM ubuntu:24.04 AS renode_base
 
 ARG RENODE_VERSION=1.16.0
 ARG RENODE_PKG=linux-portable-dotnet
@@ -27,7 +27,7 @@ RUN wget -q https://github.com/renode/renode/releases/download/v${RENODE_VERSION
     rm renode-${RENODE_VERSION}.${RENODE_PKG}.tar.gz
 
 
-FROM ubuntu:24.04 as BUILDER
+FROM ubuntu:24.04 AS builder
 
 ARG LLVM_VERSION=15
 
@@ -61,20 +61,20 @@ RUN cp ./target/debug/libdefmt_cs.so ./out/libdefmt_cs.so
 RUN cd ./bindings && dotnet build -c Release -o ./../out
 
 
-FROM RENODE_BASE
+FROM renode_base
 
 ENV TZ=UTC
 ENV PATH=/opt/renode:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV LD_LIBRARY_PATH=/opt/renode:$LD_LIBRARY_PATH
 
-COPY --from=BUILDER /build/out/libdefmt_cs.so /opt/renode/libdefmt_cs.so
-COPY --from=BUILDER /build/out/DefmtBindings.dll /opt/renode/DefmtBindings.dll
-COPY --from=BUILDER /build/out/DefmtBindings.pdb /opt/renode/DefmtBindings.pdb
-COPY --from=BUILDER /build/scripts/DefmtPlugin.cs /opt/renode/scripts/blumenplace/DefmtPlugin.cs
+COPY --from=builder /build/out/libdefmt_cs.so /opt/renode/libdefmt_cs.so
+COPY --from=builder /build/out/DefmtBindings.dll /opt/renode/DefmtBindings.dll
+COPY --from=builder /build/out/DefmtBindings.pdb /opt/renode/DefmtBindings.pdb
+COPY --from=builder /build/scripts/DefmtPlugin.cs /opt/renode/scripts/blumenplace/DefmtPlugin.cs
 
 WORKDIR /workspace
 
 EXPOSE 3333
 EXPOSE 5900
 
-CMD ["/bin/bash"]
+CMD ["/opt/renode/renode", "--disable-gui", "--console"]
