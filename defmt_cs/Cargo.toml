@@ -9,7 +9,7 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 thiserror = "2"
 defmt-decoder = "1"
-uniffi = { version = "0.29", features = [ "build", "bindgen" ] }
+uniffi = { version = "0.31.0", features = [ "build", "bindgen" ] }
 
 [build-dependencies]
-uniffi = { version = "0.29", features = [ "build", "bindgen" ] }
+uniffi = { version = "0.31.0", features = [ "build", "bindgen" ] }

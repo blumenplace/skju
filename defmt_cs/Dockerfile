@@ -49,7 +49,7 @@ COPY ./rust-toolchain.toml /tmp/rust-toolchain.toml
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain $(cat ./tmp/rust-toolchain.toml | grep "channel" | cut -f2 -d\")
 
 ENV PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-RUN cargo install uniffi-bindgen-cs --git https://github.com/NordSecurity/uniffi-bindgen-cs --tag v0.10.0+v0.29.4
+RUN cargo install uniffi-bindgen-cs --git https://github.com/blumenplace/uniffi-bindgen-cs
 
 
 WORKDIR /build
