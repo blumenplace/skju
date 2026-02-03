@@ -47,8 +47,9 @@ bindings/defmt_cs.cs: $(TARGET_LIB)
     		'</Project>' \
     		> ./bindings/DefmtBindings.csproj
 
+img: CONTAINER_ENGINE := $(shell command -v docker >/dev/null 2>&1 && echo docker || (command -v podman >/dev/null 2>&1 && echo podman))
 img:
-	@podman build \
+	@$(CONTAINER_ENGINE) build \
 		-f ./Dockerfile  \
 		--platform $(RENODE_PLATFORM) \
 		--build-arg RENODE_VERSION=$(RENODE_VERSION) \
