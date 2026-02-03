@@ -33,7 +33,7 @@ renode: build
 	  -e FIRMWARE_PATH?="/workspace/$(FIRMWARE_PATH)" \
 	  -p 3333:3333 \
 	  -p 19021:19021 \
-	  renode-skju:latest \
+	  ghcr.io/blumenplace/renode-skju:latest \
 	  renode --disable-gui --console -e 'set FIRMWARE_PATH "/workspace/$(FIRMWARE_PATH)"; start @/workspace/scripts/nrf52840dk.resc'
 
 logs:
