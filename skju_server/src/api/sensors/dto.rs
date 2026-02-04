@@ -1,6 +1,4 @@
-use crate::domain::sensor::{
-    Sensor, SensorCoordinates, SensorCreate, SensorDescription, SensorName, SensorUpdate,
-};
+use crate::domain::sensor::{Sensor, SensorCoordinates, SensorCreate, SensorDescription, SensorName, SensorUpdate};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]

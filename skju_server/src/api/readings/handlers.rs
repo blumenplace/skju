@@ -3,10 +3,10 @@ use crate::domain::reading::{ReadingTimestamp, ReadingsRange};
 use crate::domain::sensor::SensorID;
 use crate::error::ApiError;
 use crate::state::AppState;
+use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 
 pub async fn create_reading(
     State(state): State<AppState>,

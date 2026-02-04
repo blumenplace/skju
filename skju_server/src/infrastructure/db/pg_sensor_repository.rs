@@ -1,7 +1,8 @@
 use crate::domain::sensor::{DBSensor, Sensor, SensorCreate, SensorError, SensorID, SensorUpdate};
 use crate::ports::sensors_repository::SensorRepository;
 use async_trait::async_trait;
-use sqlx::{query, query_as, PgPool};
+use futures::{StreamExt, TryStreamExt};
+use sqlx::{Executor, PgPool, Postgres};
 use tracing::instrument;
 
 #[derive(Debug)]
@@ -12,6 +13,18 @@ pub struct PgSensorRepository {
 impl PgSensorRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    async fn check_if_exists<'trans, 'conn: 'trans, E>(exec: E, id: SensorID) -> Result<(), SensorError>
+    where
+        E: 'trans + Executor<'conn, Database = Postgres>,
+    {
+        let exists: bool = sqlx::query_scalar(r#"SELECT EXISTS (SELECT 1 FROM sensors WHERE id = $1 LIMIT 1)"#)
+            .bind(id)
+            .fetch_one(exec)
+            .await?;
+
+        if exists { Ok(()) } else { Err(SensorError::NotFound(id)) }
     }
 }
 
@@ -25,94 +38,80 @@ impl From<sqlx::Error> for SensorError {
 impl SensorRepository for PgSensorRepository {
     #[instrument(name = "repo.sensor.create", skip(self))]
     async fn create(&self, request: SensorCreate) -> Result<Sensor, SensorError> {
-        let sensor = query_as!(
-            DBSensor,
-            r#"INSERT INTO sensors (name, description, x, y) VALUES ($1, $2, $3, $4) RETURNING *"#,
-            request.name.value(),
-            request.description.value(),
-            request.coordinates.x(),
-            request.coordinates.y()
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let sensor: DBSensor =
+            sqlx::query_as(r#"INSERT INTO sensors (name, description, x, y) VALUES ($1, $2, $3, $4) RETURNING *"#)
+                .bind(request.name)
+                .bind(request.description)
+                .bind(request.coordinates.x())
+                .bind(request.coordinates.y())
+                .fetch_one(&self.pool)
+                .await?;
 
         Ok(sensor.into())
     }
 
     #[instrument(name = "repo.sensor.update", skip(self))]
     async fn update(&self, id: SensorID, request: SensorUpdate) -> Result<Sensor, SensorError> {
-        self.check_if_exists(id).await?;
+        let mut transaction = self.pool.begin().await?;
 
-        let sensor = query_as!(
-            DBSensor,
+        Self::check_if_exists(&mut *transaction, id).await?;
+
+        let sensor: DBSensor = sqlx::query_as(
             r#"UPDATE sensors SET name = $1, description = $2, x = $3, y = $4 WHERE id = $5 RETURNING *"#,
-            request.name.value(),
-            request.description.value(),
-            request.coordinates.x(),
-            request.coordinates.y(),
-            id.value()
         )
-        .fetch_one(&self.pool)
+        .bind(request.name)
+        .bind(request.description)
+        .bind(request.coordinates.x())
+        .bind(request.coordinates.y())
+        .bind(id)
+        .fetch_one(&mut *transaction)
         .await?;
+
+        transaction.commit().await?;
 
         Ok(sensor.into())
     }
 
     #[instrument(name = "repo.sensor.delete", skip(self))]
     async fn delete(&self, id: SensorID) -> Result<(), SensorError> {
-        self.check_if_exists(id).await?;
-
-        query!(r#"DELETE FROM sensors WHERE id = $1"#, id.value())
+        let result = sqlx::query(r#"DELETE FROM sensors WHERE id = $1"#)
+            .bind(id)
             .execute(&self.pool)
             .await?;
 
-        Ok(())
+        if result.rows_affected() != 0 {
+            Ok(())
+        } else {
+            Err(SensorError::NotFound(id))
+        }
     }
 
     #[instrument(name = "repo.sensor.list", skip(self))]
     async fn list(&self) -> Result<Vec<Sensor>, SensorError> {
-        let sensors = query_as!(DBSensor, r#"SELECT * From sensors"#)
-            .fetch_all(&self.pool)
-            .await?;
-
-        let sensors = sensors
-            .into_iter()
-            .map(|s| s.into())
-            .collect::<Vec<Sensor>>();
-
-        Ok(sensors)
+        sqlx::query_as(r#"SELECT * FROM sensors"#)
+            .fetch(&self.pool)
+            .map(|r: Result<DBSensor, _>| r.map(Sensor::from))
+            .try_collect()
+            .await
+            .map_err(SensorError::from)
     }
 
     #[instrument(name = "repo.sensor.get_by_id", skip(self))]
-    async fn get_by_id(&self, id: SensorID) -> Result<Option<Sensor>, SensorError> {
-        let sensor = query_as!(DBSensor, r#"SELECT * FROM sensors WHERE id = $1"#, id.value())
+    async fn get_by_id(&self, id: SensorID) -> Result<Sensor, SensorError> {
+        let maybe_sensor: Option<DBSensor> = sqlx::query_as(r#"SELECT * FROM sensors WHERE id = $1"#)
+            .bind(id)
             .fetch_optional(&self.pool)
             .await?;
-
-        let sensor = sensor.map(Into::into);
-
-        if sensor.is_none() {
-            return Err(SensorError::NotFound);
-        }
-
-        Ok(sensor)
+        maybe_sensor
+            .map(Into::into)
+            .ok_or(SensorError::NotFound(id))
     }
 
     #[instrument(name = "repo.sensor.delete_all", skip(self))]
     async fn delete_all(&self) -> Result<(), SensorError> {
-        query!(r#"DELETE FROM sensors"#).execute(&self.pool).await?;
-        Ok(())
-    }
-
-    async fn check_if_exists(&self, id: SensorID) -> Result<(), SensorError> {
-        let sensor = query!(r#"SELECT * FROM sensors WHERE id = $1"#, id.value())
-            .fetch_optional(&self.pool)
+        sqlx::query(r#"DELETE FROM sensors"#)
+            .execute(&self.pool)
             .await?;
-
-        if sensor.is_none() {
-            return Err(SensorError::NotFound);
-        }
-
         Ok(())
     }
 }

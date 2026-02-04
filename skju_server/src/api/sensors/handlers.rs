@@ -66,7 +66,7 @@ pub async fn get_sensor_by_id(
         .sensor_service
         .get_by_id(sensor_id)
         .await?;
-    let sensor: Option<SensorModel> = result.map(|sensor| sensor.into());
+    let sensor: SensorModel = result.into();
     let response = (StatusCode::OK, Json(sensor));
 
     Ok(response)
