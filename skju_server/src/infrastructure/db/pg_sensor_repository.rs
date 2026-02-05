@@ -52,10 +52,6 @@ impl SensorRepository for PgSensorRepository {
 
     #[instrument(name = "repo.sensor.update", skip(self))]
     async fn update(&self, id: SensorID, request: SensorUpdate) -> Result<Sensor, SensorError> {
-        let mut transaction = self.pool.begin().await?;
-
-        Self::check_if_exists(&mut *transaction, id).await?;
-
         let sensor: DBSensor = sqlx::query_as(
             r#"UPDATE sensors SET name = $1, description = $2, x = $3, y = $4 WHERE id = $5 RETURNING *"#,
         )
@@ -64,10 +60,8 @@ impl SensorRepository for PgSensorRepository {
         .bind(request.coordinates.x())
         .bind(request.coordinates.y())
         .bind(id)
-        .fetch_one(&mut *transaction)
+        .fetch_one(&self.pool)
         .await?;
-
-        transaction.commit().await?;
 
         Ok(sensor.into())
     }
