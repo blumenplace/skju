@@ -1,13 +1,24 @@
 use chrono::{DateTime, Utc};
 use std::fmt;
+use std::fmt::Formatter;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, sqlx::Type)]
+#[sqlx(transparent)]
 pub struct SensorID(i32);
 
-#[derive(Debug, Clone)]
+impl fmt::Display for SensorID {
+    #[inline(always)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+#[derive(Debug, Clone, sqlx::Type)]
+#[sqlx(transparent)]
 pub struct SensorName(String);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, sqlx::Type)]
+#[sqlx(transparent)]
 pub struct SensorDescription(Option<String>);
 
 #[derive(Debug, Clone, Copy)]
@@ -25,7 +36,7 @@ pub struct Sensor {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, sqlx::FromRow)]
 pub struct DBSensor {
     pub id: i32,
     pub name: String,
@@ -51,7 +62,7 @@ pub struct SensorUpdate {
 
 #[derive(Debug)]
 pub enum SensorError {
-    NotFound,
+    NotFound(SensorID),
     Internal(String),
     Database(String),
     Validation(String),
@@ -60,10 +71,10 @@ pub enum SensorError {
 impl fmt::Display for SensorError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SensorError::NotFound => write!(formatter, "Sensor not found"),
-            SensorError::Internal(e) => write!(formatter, "Internal error: {}", e),
-            SensorError::Database(e) => write!(formatter, "Database error: {}", e),
-            SensorError::Validation(e) => write!(formatter, "Validation error: {}", e),
+            SensorError::NotFound(id) => write!(formatter, "Sensor {id} not found"),
+            SensorError::Internal(e) => write!(formatter, "Internal error: {e}"),
+            SensorError::Database(e) => write!(formatter, "Database error: {e}"),
+            SensorError::Validation(e) => write!(formatter, "Validation error: {e}"),
         }
     }
 }

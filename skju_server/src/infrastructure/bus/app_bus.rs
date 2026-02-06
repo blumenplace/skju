@@ -1,8 +1,8 @@
 use crate::application::messages::AppMessage;
 use crate::ports::bus_service::{BusError, BusMessage, BusService};
 use async_trait::async_trait;
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::error::SendError;
 use tracing::instrument;
 
 pub struct AppBus {

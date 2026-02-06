@@ -46,9 +46,8 @@ impl SensorService for Service {
     }
 
     #[instrument(name = "service.sensor.get_by_id", skip(self), err)]
-    async fn get_by_id(&self, id: SensorID) -> Result<Option<Sensor>, SensorError> {
-        let result = self.repository.get_by_id(id).await?;
-        Ok(result)
+    async fn get_by_id(&self, id: SensorID) -> Result<Sensor, SensorError> {
+        self.repository.get_by_id(id).await
     }
 
     #[instrument(name = "service.sensor.delete_all", skip(self), err)]
