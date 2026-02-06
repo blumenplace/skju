@@ -1,10 +1,9 @@
-use byteorder::{LittleEndian, BigEndian, ReadBytesExt, ByteOrder};
+use byteorder::{BigEndian, ByteOrder, LittleEndian, ReadBytesExt};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::Cursor;
 use std::io::Error as IoError;
 use std::mem::size_of;
-
 
 pub(crate) type Coordinate = f64;
 
@@ -31,16 +30,17 @@ impl sqlx::Type<sqlx::Postgres> for Point {
 }
 
 impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Point {
-    fn decode(
-        value: sqlx::postgres::PgValueRef<'r>,
-    ) -> Result<Self, Box<dyn Error + Send + Sync>> {
+    fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, Box<dyn Error + Send + Sync>> {
         let bytes: &'r [u8] = <&'r [u8] as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         decode(bytes).map_err(|e| e.into())
     }
 }
 
 impl<'q> sqlx::Encode<'q, sqlx::Postgres> for Point {
-    fn encode_by_ref(&self, buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         encode(self).encode_by_ref(buf)
     }
 
@@ -49,7 +49,6 @@ impl<'q> sqlx::Encode<'q, sqlx::Postgres> for Point {
         FULL_POINT_EWKB_SIZE
     }
 }
-
 
 #[derive(Debug)]
 pub(crate) enum PointDecodeError {
@@ -68,7 +67,7 @@ impl Display for PointDecodeError {
     }
 }
 
-impl Error for PointDecodeError { }
+impl Error for PointDecodeError {}
 
 impl From<IoError> for PointDecodeError {
     fn from(err: IoError) -> Self {
@@ -106,8 +105,6 @@ fn decode_with_byte_order<E: ByteOrder>(data: &[u8]) -> Result<Point, PointDecod
         return Err(PointDecodeError::UnexpectedEod);
     }
 
-
-
     let mut cursor = Cursor::new(data);
     let geometry_type = cursor.read_u32::<E>()?;
 
@@ -144,12 +141,12 @@ fn encode_with_byte_order<E: ByteOrder>(point: &Point, output: &mut [u8]) {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use super::*;
     use sqlx::postgres::PgPoolOptions;
-    use testcontainers::*;
+    use std::time::Duration;
     use testcontainers::core::{ContainerPort, WaitFor};
-    use testcontainers::runners::{AsyncRunner};
+    use testcontainers::runners::AsyncRunner;
+    use testcontainers::*;
 
     async fn connect_with_retry(url: &str) -> sqlx::PgPool {
         let mut last_err = None;
@@ -188,7 +185,10 @@ mod tests {
             .await
             .expect("failed to start PostGIS testcontainer");
 
-        let host_port = container.get_host_port_ipv4(ContainerPort::Tcp(5432)).await.expect("failed to get host port");
+        let host_port = container
+            .get_host_port_ipv4(ContainerPort::Tcp(5432))
+            .await
+            .expect("failed to get host port");
         let database_url = format!("postgres://postgres:postgres@127.0.0.1:{host_port}/testdb");
 
         let pool = connect_with_retry(&database_url).await;
