@@ -29,14 +29,8 @@ jobs:
       - name: Run coverage
         run: cargo tarpaulin --locked --all-features --all-targets --out Lcov
 
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v6
+      - name: Upload to Coveralls
+        uses: coverallsapp/github-action@v2
         with:
-          name: coverage-lcov
-          path: lcov.info
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: lcov.info
-          # token: ${{ secrets.CODECOV_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: lcov.info
