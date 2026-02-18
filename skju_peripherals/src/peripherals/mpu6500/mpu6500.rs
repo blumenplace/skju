@@ -1,7 +1,7 @@
 use crate::bus::Bus;
 use crate::mpu6500::builder::NoTimer;
 use crate::mpu6500::fifo::MAX_FIFO_BUFFER_SIZE;
-use crate::mpu6500::registers::SIGNAL_PATH_RESET;
+use crate::mpu6500::registers::{SIGNAL_PATH_RESET, USER_CTRL};
 use crate::peripherals::mpu6500::builder::{MPU6500Builder, NoBus};
 use crate::peripherals::mpu6500::fifo::FIFOLayout;
 use crate::peripherals::mpu6500::interrupts::InterruptStatus;
@@ -120,6 +120,55 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
             .await;
 
         buffer.copy_from_slice(&read_into[1..len]);
+    }
+
+    pub async fn reset_fifo(&mut self) {
+        let mut initial_user_ctrl = [0x00; 2];
+        let mut initial_fifo_en = [0x00; 2];
+        let partial_reset = 1 << 2 | 1 << 1 | 1 << 0;
+
+        // Save current values of user_ctrn and enabled fifo flags
+        self.bus
+            .send_then_read(&[USER_CTRL | READ_MASK, 0x00], &mut initial_user_ctrl)
+            .await;
+
+        self.bus
+            .send_then_read(&[FIFO_EN | READ_MASK, 0x00], &mut initial_fifo_en)
+            .await;
+
+        let updated_user_ctrl = initial_user_ctrl[1] | (1 << 2);
+
+        // Temporary disable fifo and mark it for reset
+        self.bus
+            .send(&[USER_CTRL & WRITE_MASK, updated_user_ctrl])
+            .await;
+
+        // Reset gyro / accel / temp signal paths (same as for full device reset)
+        self.bus
+            .send(&[SIGNAL_PATH_RESET & WRITE_MASK, partial_reset])
+            .await;
+
+        // Read int status to fully reset it
+        // TODO: consider preserving other flags when updating self.latest_interrupts
+        self.bus
+            .send_then_read(&[INT_STATUS | READ_MASK, 0x00], &mut [0x00; 2])
+            .await;
+
+        // Temporary disable FIFO to prevent further sampling
+        self.bus.send(&[FIFO_EN & WRITE_MASK, 0x00]).await;
+
+        // Restore initial user_ctrl state
+        self.bus
+            .send(&[USER_CTRL & WRITE_MASK, initial_user_ctrl[1]])
+            .await;
+
+        // Restore initial enabled fifo flags
+        self.bus
+            .send(&[FIFO_EN & WRITE_MASK, initial_fifo_en[1]])
+            .await;
+
+        // Reset internal interrupts state
+        self.latest_interrupts = 0x00;
     }
 
     pub async fn fifo_layout(&mut self) -> FIFOLayout {
