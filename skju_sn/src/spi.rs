@@ -1,6 +1,6 @@
 use embassy_nrf::gpio::Output;
 use embassy_nrf::spim::Spim;
-use embassy_sync::blocking_mutex::raw::NoopRawMutex;
+use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
 use embassy_sync::mutex::Mutex;
 use skju_peripherals;
 use skju_peripherals::bus::Bus;

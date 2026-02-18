@@ -1,7 +1,7 @@
 #![no_std]
 
 pub mod bus;
-pub mod timer;
 mod peripherals;
+pub mod timer;
 
 pub use peripherals::*;

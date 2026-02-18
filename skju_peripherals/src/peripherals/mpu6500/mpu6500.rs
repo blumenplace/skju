@@ -1,5 +1,6 @@
 use crate::bus::Bus;
 use crate::mpu6500::builder::NoTimer;
+use crate::mpu6500::fifo::MAX_FIFO_BUFFER_SIZE;
 use crate::mpu6500::registers::SIGNAL_PATH_RESET;
 use crate::peripherals::mpu6500::builder::{MPU6500Builder, NoBus};
 use crate::peripherals::mpu6500::fifo::FIFOLayout;
@@ -32,12 +33,14 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
     }
 
     pub async fn read_register(&mut self, register: u8) -> u8 {
-        let address = register | READ_MASK;
-        let mut read_into = [0x00; 1];
+        let bytes_to_send = [register | READ_MASK, 0x00];
+        let mut read_into = [0x00; 2];
 
-        self.bus.send_then_read(&[address], &mut read_into).await;
+        self.bus
+            .send_then_read(&bytes_to_send, &mut read_into)
+            .await;
 
-        read_into[0]
+        read_into[1]
     }
 
     pub async fn write_register(&mut self, register: u8, value: u8) {
@@ -46,11 +49,14 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
     }
 
     pub async fn set_interrupt_status(&mut self) {
-        let mut read_into = [0x00; 1];
-        let address = INT_STATUS | READ_MASK;
+        let mut read_into = [0x00; 2];
+        let bytes_to_send = [INT_STATUS | READ_MASK, 0x00];
 
-        self.bus.send_then_read(&[address], &mut read_into).await;
-        self.latest_interrupts = self.latest_interrupts | read_into[0];
+        self.bus
+            .send_then_read(&bytes_to_send, &mut read_into)
+            .await;
+
+        self.latest_interrupts = self.latest_interrupts | read_into[1];
     }
 
     pub fn test_interrupt_status(&mut self, status: InterruptStatus) -> bool {
@@ -64,14 +70,16 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
     }
 
     pub async fn read_accel(&mut self) -> (i16, i16, i16) {
-        let start_address = ACCEL_XOUT_H | READ_MASK;
-        let mut read_into = [0u8; 6];
+        let mut bytes_to_send = [0x00; 7];
+        let mut read_into = [0u8; 7];
+
+        bytes_to_send[0] = ACCEL_XOUT_H | READ_MASK;
 
         self.bus
-            .send_then_read(&[start_address], &mut read_into)
+            .send_then_read(&bytes_to_send, &mut read_into)
             .await;
 
-        let [x_high, x_low, y_high, y_low, z_high, z_low] = read_into;
+        let [_, x_high, x_low, y_high, y_low, z_high, z_low] = read_into;
         let x = i16::from_be_bytes([x_high, x_low]);
         let y = i16::from_be_bytes([y_high, y_low]);
         let z = i16::from_be_bytes([z_high, z_low]);
@@ -80,14 +88,16 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
     }
 
     pub async fn read_gyro(&mut self) -> (i16, i16, i16) {
-        let start_address = GYRO_XOUT_H | READ_MASK;
-        let mut read_into = [0u8; 6];
+        let mut bytes_to_send = [0x00; 7];
+        let mut read_into = [0u8; 7];
+
+        bytes_to_send[0] = GYRO_XOUT_H | READ_MASK;
 
         self.bus
-            .send_then_read(&[start_address], &mut read_into)
+            .send_then_read(&bytes_to_send, &mut read_into)
             .await;
 
-        let [x_high, x_low, y_high, y_low, z_high, z_low] = read_into;
+        let [_, x_high, x_low, y_high, y_low, z_high, z_low] = read_into;
         let x = i16::from_be_bytes([x_high, x_low]);
         let y = i16::from_be_bytes([y_high, y_low]);
         let z = i16::from_be_bytes([z_high, z_low]);
@@ -97,16 +107,30 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
 
     pub async fn drain_fifo(&mut self, buffer: &mut [u8]) {
         let address = FIFO_R_W | READ_MASK;
-        self.bus.send_then_read(&[address], buffer).await;
+
+        let mut bytes_to_send = [0u8; MAX_FIFO_BUFFER_SIZE + 1];
+        let mut read_into = [0u8; MAX_FIFO_BUFFER_SIZE + 1];
+
+        bytes_to_send[0] = address;
+
+        let len = buffer.len() + 1;
+
+        self.bus
+            .send_then_read(&bytes_to_send[..len], &mut read_into[..len])
+            .await;
+
+        buffer.copy_from_slice(&read_into[1..len]);
     }
 
     pub async fn fifo_layout(&mut self) -> FIFOLayout {
-        let address = FIFO_EN | READ_MASK;
-        let mut read_into = [0];
+        let bytes_to_send = [FIFO_EN | READ_MASK, 0];
+        let mut read_into = [0x00; 2];
 
-        self.bus.send_then_read(&[address], &mut read_into).await;
+        self.bus
+            .send_then_read(&bytes_to_send, &mut read_into)
+            .await;
 
-        let fifo_layout = FIFOLayout::from_fifo_register(read_into[0]);
+        let fifo_layout = FIFOLayout::from_fifo_register(read_into[1]);
 
         fifo_layout
     }
@@ -120,14 +144,14 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
     }
 
     pub async fn fifo_sample_count(&mut self) -> u16 {
-        let start_address = FIFO_COUNT_H | READ_MASK;
-        let mut read_into = [0u8; 2];
+        let bytes_to_send = [FIFO_COUNT_H | READ_MASK, 0x00, 0x00];
+        let mut read_into = [0u8; 3];
 
         self.bus
-            .send_then_read(&[start_address], &mut read_into)
+            .send_then_read(&bytes_to_send, &mut read_into)
             .await;
 
-        let [count_high, count_low] = read_into;
+        let [_, count_high, count_low] = read_into;
         let count_high_mask = 0x1F;
         let total_count = u16::from_be_bytes([count_high & count_high_mask, count_low]);
 
@@ -166,16 +190,15 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
     }
 
     pub async fn disable_accel_axes(&mut self, axes: [bool; 3]) {
-        let mut curr = [0x00; 1];
+        let mut curr = [0x00; 2];
+        let bytes_to_send = [PWR_MGMT_2 | READ_MASK, 0x00];
         let x_mask = 1 << 5;
         let y_mask = 1 << 4;
         let z_mask = 1 << 3;
 
-        self.bus
-            .send_then_read(&[PWR_MGMT_2 | READ_MASK], &mut curr)
-            .await;
+        self.bus.send_then_read(&bytes_to_send, &mut curr).await;
 
-        let updated = if axes[0] { curr[0] | x_mask } else { curr[0] & !x_mask };
+        let updated = if axes[0] { curr[1] | x_mask } else { curr[1] & !x_mask };
         let updated = if axes[1] { updated | y_mask } else { updated & !y_mask };
         let updated = if axes[2] { updated | z_mask } else { updated & !z_mask };
 
@@ -183,16 +206,15 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
     }
 
     pub async fn disable_gyro_axes(&mut self, axes: [bool; 3]) {
-        let mut curr = [0x00; 1];
+        let mut curr = [0x00; 2];
+        let bytes_to_send = [PWR_MGMT_2 | READ_MASK, 0x00];
         let x_mask = 1 << 2;
         let y_mask = 1 << 1;
         let z_mask = 1 << 0;
 
-        self.bus
-            .send_then_read(&[PWR_MGMT_2 | READ_MASK], &mut curr)
-            .await;
+        self.bus.send_then_read(&bytes_to_send, &mut curr).await;
 
-        let updated = if axes[0] { curr[0] | x_mask } else { curr[0] & !x_mask };
+        let updated = if axes[0] { curr[1] | x_mask } else { curr[1] & !x_mask };
         let updated = if axes[1] { updated | y_mask } else { updated & !y_mask };
         let updated = if axes[2] { updated | z_mask } else { updated & !z_mask };
 
@@ -200,13 +222,12 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
     }
 
     async fn set_power_mng_1_bit(&mut self, bit: u8, enabled: bool) {
-        let mut current = [0x00; 1];
+        let mut current = [0x00; 2];
+        let bytes_to_send = [PWR_MGMT_1 | READ_MASK, 0x00];
 
-        self.bus
-            .send_then_read(&[PWR_MGMT_1 | READ_MASK], &mut current)
-            .await;
+        self.bus.send_then_read(&bytes_to_send, &mut current).await;
 
-        let updated = if enabled { current[0] | bit } else { current[0] & !bit };
+        let updated = if enabled { current[1] | bit } else { current[1] & !bit };
 
         self.bus.send(&[PWR_MGMT_1 | WRITE_MASK, updated]).await;
     }
