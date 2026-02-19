@@ -3,9 +3,9 @@
 #![no_std]
 #![no_main]
 mod ble;
+mod constants;
 mod spi;
 mod timer;
-mod utils;
 
 use core::sync::atomic::{AtomicBool, Ordering};
 
@@ -13,7 +13,6 @@ use embassy_executor::Spawner;
 use embassy_nrf::config::Config;
 use embassy_nrf::gpio::{Input, Level, Output, OutputDrive, Pull};
 use embassy_nrf::interrupt::{InterruptExt, Priority};
-use embassy_nrf::pac::SPIM2;
 use embassy_nrf::spim::Spim;
 use embassy_nrf::{bind_interrupts, peripherals, spim};
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
@@ -24,21 +23,20 @@ use futures::future::{Either, select};
 use futures::pin_mut;
 use nrf_softdevice::Softdevice;
 use nrf_softdevice::ble::{Connection, gatt_server, peripheral};
-use skju_peripherals::bus::Bus;
 use skju_peripherals::mpu6500::MPU6500;
-use skju_peripherals::mpu6500::accel::AccelConfig;
-use skju_peripherals::mpu6500::config::MPU6500Config;
+use skju_peripherals::mpu6500::accel::{AccelConfig, AccelDLPFOptions};
+use skju_peripherals::mpu6500::config::{ConfigDLPFOptions, MPU6500Config};
 use skju_peripherals::mpu6500::fifo::{FIFOConfig, FIFOMode, FIFOSensors, MAX_FIFO_BUFFER_SIZE};
 use skju_peripherals::mpu6500::gyro::GyroConfig;
 use skju_peripherals::mpu6500::interrupts::{INTConfig, INTEnableFlags, INTFlags, InterruptStatus};
-use skju_peripherals::mpu6500::registers::{FIFO_EN, INT_ENABLE, USER_CTRL, WHO_AM_I};
+use skju_peripherals::mpu6500::registers::{INT_ENABLE, USER_CTRL, WHO_AM_I};
 use skju_peripherals::mpu6500::user_control::UserControlConfig;
 use {defmt_rtt as _, panic_probe as _};
 
 use crate::ble::{ADV_DATA, ReadingsServer, ReadingsServerEvent, ReadingsServiceEvent, SCAN_DATA, softdevice_task};
+use crate::constants::{MAX_SAMPLE_COUNT, SAMPLE_RATE_HZ, SAMPLE_SIZE};
 use crate::spi::SpiDeviceBus;
 use crate::timer::TimerHandler;
-use crate::utils::{MAX_SAMPLE_COUNT, SAMPLE_SIZE};
 
 bind_interrupts!(struct Irqs {
     SPI2 => spim::InterruptHandler<peripherals::SPI2>;
@@ -68,14 +66,18 @@ async fn main(spawner: Spawner) {
     let spi_bus = SpiDeviceBus::new(spim, mpu_cs);
     let mpu_int: Input = Input::new(p.P0_31, Pull::Up);
     let fifo_sensors = FIFOSensors::GYRO_X | FIFOSensors::GYRO_Y | FIFOSensors::GYRO_Z | FIFOSensors::ACCEL;
+    let sample_rate_divider = (1000 / SAMPLE_RATE_HZ) - 1;
+    let sample_rate_divider = sample_rate_divider.clamp(0, 255) as u8;
+
     let mpu6500 = MPU6500::<SpiDeviceBus, TimerHandler>::builder()
         .with_bus(spi_bus)
         .with_timer(TimerHandler)
-        .with_config(MPU6500Config::default())
+        .with_config(MPU6500Config::default().dlpf_cfg(ConfigDLPFOptions::CFG1))
         .with_accel_config(AccelConfig::default())
         .with_user_ctrl_config(UserControlConfig::default().enable_fifo())
-        .with_gyro_config(GyroConfig::default())
+        .with_gyro_config(GyroConfig::default().f_choice_b(0))
         .with_fifo_config(FIFOConfig::default().mode(FIFOMode::Override).sensors(fifo_sensors))
+        .with_sample_rate_divider(sample_rate_divider)
         .with_int_config(
             INTConfig::default()
                 .int_enable_flags(INTEnableFlags::FIFO_OVERFLOW_EN | INTEnableFlags::RAW_RDY_EN)
@@ -103,6 +105,7 @@ async fn main(spawner: Spawner) {
 async fn handle_mpu_interrupts(mut mpu6500: MPU6500<SpiDeviceBus, TimerHandler>, mut int_pin: Input<'static>) {
     let who = mpu6500.read_register(WHO_AM_I).await;
     let fifo_layout = mpu6500.fifo_layout().await;
+    let batch_size = MAX_SAMPLE_COUNT * fifo_layout.size;
 
     defmt::info!("WHOAMI  {:08b}", who);
 
@@ -111,27 +114,25 @@ async fn handle_mpu_interrupts(mut mpu6500: MPU6500<SpiDeviceBus, TimerHandler>,
         mpu6500.set_interrupt_status().await;
 
         if mpu6500.test_interrupt_status(InterruptStatus::FIFO_OVERFLOW_INT) {
-            // TODO: configure SMPLRT_DIV, set sampling to lower freq to see if overflows occur less
             defmt::info!("FIFO overflow occured");
             mpu6500.reset_fifo().await;
             continue;
         }
 
-        let current_sample_count = mpu6500.fifo_sample_count().await;
+        let current_sample_count = mpu6500.fifo_bytes_count().await;
 
-        if (current_sample_count as usize) < MAX_SAMPLE_COUNT {
+        if (current_sample_count as usize) < batch_size {
             continue;
         }
 
-        let total_bytes = MAX_SAMPLE_COUNT * fifo_layout.size;
         let mut buffer: [u8; MAX_FIFO_BUFFER_SIZE] = [0x00; MAX_FIFO_BUFFER_SIZE];
         let mut readings = [0x00; MAX_SAMPLE_COUNT * SAMPLE_SIZE];
 
-        mpu6500.drain_fifo(&mut buffer[..total_bytes]).await;
+        mpu6500.drain_fifo(&mut buffer[..batch_size]).await;
         readings.copy_from_slice(&buffer[..MAX_SAMPLE_COUNT * SAMPLE_SIZE]);
 
         let readings = Readings {
-            bytes_to_read: total_bytes,
+            bytes_to_read: batch_size,
             readings,
         };
 

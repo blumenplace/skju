@@ -27,6 +27,7 @@ pub struct MPU6500Builder<B, T> {
     pub user_ctrl_config: Option<UserControlConfig>,
     pub int_config: Option<INTConfig>,
     pub power_management_config: Option<PowerManagementConfig>,
+    pub sample_rate_divider: u8,
 }
 
 impl<T> MPU6500Builder<NoBus, T> {
@@ -41,6 +42,7 @@ impl<T> MPU6500Builder<NoBus, T> {
             user_ctrl_config: self.user_ctrl_config,
             int_config: self.int_config,
             power_management_config: self.power_management_config,
+            sample_rate_divider: self.sample_rate_divider,
         }
     }
 }
@@ -57,6 +59,7 @@ impl<B> MPU6500Builder<B, NoTimer> {
             user_ctrl_config: self.user_ctrl_config,
             int_config: self.int_config,
             power_management_config: self.power_management_config,
+            sample_rate_divider: self.sample_rate_divider,
         }
     }
 }
@@ -94,6 +97,11 @@ impl<B, T> MPU6500Builder<B, T> {
 
     pub fn with_power_management_config(mut self, config: PowerManagementConfig) -> MPU6500Builder<B, T> {
         self.power_management_config = Some(config);
+        self
+    }
+
+    pub fn with_sample_rate_divider(mut self, divider: u8) -> MPU6500Builder<B, T> {
+        self.sample_rate_divider = divider;
         self
     }
 }
@@ -153,6 +161,11 @@ impl<T: Bus, U: Timer> MPU6500Builder<WithBus<T>, WithTimer<U>> {
                 power_management_bytes[1],
             ];
 
+            bus.send(&bytes_to_send).await;
+        }
+
+        if self.sample_rate_divider != 0 {
+            let bytes_to_send = [SMPLRT_DIV & WRITE_MASK, self.sample_rate_divider];
             bus.send(&bytes_to_send).await;
         }
 

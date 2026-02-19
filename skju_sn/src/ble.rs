@@ -1,7 +1,7 @@
 use nrf_softdevice::ble::advertisement_builder::{AdvertisementBuilder, AdvertisementPayload, Flag, ServiceList};
 use nrf_softdevice::{Softdevice, raw};
 
-use crate::utils::{MAX_SAMPLE_COUNT, SAMPLE_SIZE};
+use crate::constants::{MAX_SAMPLE_COUNT, SAMPLE_SIZE};
 
 pub static ADV_DATA: AdvertisementPayload<32> = AdvertisementBuilder::new()
     .flags(&[Flag::GeneralDiscovery, Flag::LE_Only])

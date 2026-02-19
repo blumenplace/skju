@@ -11,6 +11,7 @@ bitflags::bitflags! {
 pub struct GyroConfig {
     pub range: GyroRange,
     pub st_flags: SelfTestFlags,
+    pub f_choice_b: u8,
 }
 
 impl Default for GyroConfig {
@@ -18,6 +19,7 @@ impl Default for GyroConfig {
         Self {
             range: GyroRange::R250dps,
             st_flags: SelfTestFlags::empty(),
+            f_choice_b: 0,
         }
     }
 }
@@ -33,8 +35,14 @@ impl GyroConfig {
         self
     }
 
+    /// FCHOICE_B bits [1; 0], value should be {0, 1, 2, 3}
+    pub fn f_choice_b(mut self, f_choice: u8) -> Self {
+        self.f_choice_b = f_choice;
+        self
+    }
+
     pub fn bits(&self) -> u8 {
-        self.st_flags.bits() | ((self.range as u8) << 3)
+        self.st_flags.bits() | ((self.range as u8) << 3) | (self.f_choice_b & 0b11)
     }
 }
 

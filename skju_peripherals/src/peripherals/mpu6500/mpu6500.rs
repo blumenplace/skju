@@ -29,6 +29,7 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
             accel_config: None,
             user_ctrl_config: None,
             power_management_config: None,
+            sample_rate_divider: 0,
         }
     }
 
@@ -184,15 +185,7 @@ impl<T: Bus, U: Timer> MPU6500<T, U> {
         fifo_layout
     }
 
-    // TODO: Check if we should handle a case where the total count changes (prob not)
-    pub async fn total_fifo_bytes(&mut self) -> u16 {
-        let fifo_layout = self.fifo_layout().await;
-        let fifo_sample_count = self.fifo_sample_count().await;
-
-        fifo_sample_count * fifo_layout.size as u16
-    }
-
-    pub async fn fifo_sample_count(&mut self) -> u16 {
+    pub async fn fifo_bytes_count(&mut self) -> u16 {
         let bytes_to_send = [FIFO_COUNT_H | READ_MASK, 0x00, 0x00];
         let mut read_into = [0u8; 3];
 
