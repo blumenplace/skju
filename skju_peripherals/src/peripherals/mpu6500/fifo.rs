@@ -75,7 +75,7 @@ impl FIFOEntry {
 
 pub struct FIFOLayout {
     pub fields: heapless::Vec<FIFOEntry, 7>,
-    pub size: usize,
+    pub sample_size: usize,
 }
 
 impl FIFOLayout {
@@ -125,7 +125,7 @@ impl FIFOLayout {
             offset += 2;
         }
 
-        Self { fields, size: offset }
+        Self { fields, sample_size: offset }
     }
 }
 

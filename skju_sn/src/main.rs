@@ -105,40 +105,34 @@ async fn main(spawner: Spawner) {
 async fn handle_mpu_interrupts(mut mpu6500: MPU6500<SpiDeviceBus, TimerHandler>, mut int_pin: Input<'static>) {
     let who = mpu6500.read_register(WHO_AM_I).await;
     let fifo_layout = mpu6500.fifo_layout().await;
-    let batch_size = MAX_SAMPLE_COUNT * fifo_layout.size;
 
     defmt::info!("WHOAMI  {:08b}", who);
+
+    if fifo_layout.sample_size != SAMPLE_SIZE {
+        panic!("Unexpected sample size: {}", fifo_layout.sample_size);
+    }
 
     loop {
         int_pin.wait_for_falling_edge().await;
         mpu6500.set_interrupt_status().await;
 
         if mpu6500.test_interrupt_status(InterruptStatus::FIFO_OVERFLOW_INT) {
-            defmt::info!("FIFO overflow occured");
             mpu6500.reset_fifo().await;
             continue;
         }
 
         let current_sample_count = mpu6500.fifo_bytes_count().await;
+        let batch_size = MAX_SAMPLE_COUNT * fifo_layout.sample_size;
+        let mut readings = [0x00; MAX_SAMPLE_COUNT * SAMPLE_SIZE];
 
         if (current_sample_count as usize) < batch_size {
             continue;
         }
 
-        let mut buffer: [u8; MAX_FIFO_BUFFER_SIZE] = [0x00; MAX_FIFO_BUFFER_SIZE];
-        let mut readings = [0x00; MAX_SAMPLE_COUNT * SAMPLE_SIZE];
+        mpu6500.drain_fifo(&mut readings).await;
+        print_readings(&readings);
 
-        mpu6500.drain_fifo(&mut buffer[..batch_size]).await;
-        readings.copy_from_slice(&buffer[..MAX_SAMPLE_COUNT * SAMPLE_SIZE]);
-
-        let readings = Readings {
-            bytes_to_read: batch_size,
-            readings,
-        };
-
-        print_readings(&readings.readings);
-
-        let _ = READINGS_CHANNEL.sender().try_send(readings);
+        let _ = READINGS_CHANNEL.sender().try_send(Readings { batch_size, readings });
     }
 }
 
@@ -182,7 +176,7 @@ async fn process_readings(connection: &Connection, server: &ReadingsServer) {
     loop {
         let batch = READINGS_CHANNEL.receiver().receive().await;
 
-        defmt::info!("Readings: {=[u8]:x}", &batch.readings[..batch.bytes_to_read]);
+        defmt::info!("Readings: {=[u8]:x}", &batch.readings[..batch.batch_size]);
 
         if !NOTIFY_ENABLED.load(Ordering::Acquire) {
             Timer::after_millis(1000).await;
@@ -199,7 +193,7 @@ async fn process_readings(connection: &Connection, server: &ReadingsServer) {
 }
 
 struct Readings {
-    bytes_to_read: usize,
+    batch_size: usize,
     readings: [u8; MAX_SAMPLE_COUNT * SAMPLE_SIZE],
 }
 
