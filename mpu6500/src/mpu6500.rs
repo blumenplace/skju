@@ -1,17 +1,17 @@
 //! Implementation of MPU6500 peripheral instance.
 
+use crate::builder::NoTimer;
+use crate::builder::{MPU6500Builder, NoBus};
 use crate::bus::Bus;
-use crate::mpu6500::builder::NoTimer;
-use crate::mpu6500::fifo::MAX_FIFO_BUFFER_SIZE;
-use crate::mpu6500::registers::{SIGNAL_PATH_RESET, USER_CTRL};
-use crate::peripherals::mpu6500::builder::{MPU6500Builder, NoBus};
-use crate::peripherals::mpu6500::fifo::FIFOLayout;
-use crate::peripherals::mpu6500::interrupts::InterruptStatus;
-use crate::peripherals::mpu6500::registers::{
+use crate::fifo::FIFOLayout;
+use crate::fifo::MAX_FIFO_BUFFER_SIZE;
+use crate::interrupts::InterruptStatus;
+use crate::registers::{
     ACCEL_XOUT_H, FIFO_COUNT_H, FIFO_EN, FIFO_R_W, GYRO_XOUT_H, INT_STATUS, PWR_MGMT_1, PWR_MGMT_2,
 };
-use crate::peripherals::mpu6500::utils::{READ_MASK, WRITE_MASK};
+use crate::registers::{SIGNAL_PATH_RESET, USER_CTRL};
 use crate::timer::Timer;
+use crate::utils::{READ_MASK, WRITE_MASK};
 
 pub struct MPU6500<T: Bus, U: Timer> {
     /// Provides a common interface to communicate with the MPU6500 bus.
@@ -19,7 +19,7 @@ pub struct MPU6500<T: Bus, U: Timer> {
     pub bus: T,
 
     /// Provides a common interface to wait for a specified amount of time.
-    /// See [crate::timer].
+    /// See [crate::mpu6500::timer].
     pub timer: U,
 
     /// Internal state of latest interrupts.

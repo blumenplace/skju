@@ -1,5 +1,5 @@
 use embassy_time::Timer as EmbassyTimer;
-use skju_peripherals::timer::Timer;
+use mpu6500::timer::Timer;
 
 pub struct TimerHandler;
 

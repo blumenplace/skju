@@ -10,7 +10,7 @@ rtt = ["dep:defmt-rtt"]
 
 [dependencies]
 cortex-m = { version = "0.7.7", default-features = false, features = ["inline-asm"] }
-skju_peripherals = { path = "../skju_peripherals" }
+mpu6500 = { path = "../mpu6500" }
 cortex-m-rt = "0.7.5"
 defmt = "1"
 defmt-rtt = { version = "1", optional = true }

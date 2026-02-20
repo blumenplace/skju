@@ -11,18 +11,18 @@
 //!
 //! Before updating configured registers, the final build() method will perform a full device reset
 //! unless configured otherwise.
+use crate::accel::AccelConfig;
 use crate::bus::Bus;
-use crate::peripherals::mpu6500::accel::AccelConfig;
-use crate::peripherals::mpu6500::config::MPU6500Config;
-use crate::peripherals::mpu6500::fifo::{FIFOConfig, FIFOLayout, FIFOMode};
-use crate::peripherals::mpu6500::gyro::GyroConfig;
-use crate::peripherals::mpu6500::interrupts::INTConfig;
-use crate::peripherals::mpu6500::mpu6500::MPU6500;
-use crate::peripherals::mpu6500::power_management::PowerManagementConfig;
-use crate::peripherals::mpu6500::registers::*;
-use crate::peripherals::mpu6500::user_control::UserControlConfig;
-use crate::peripherals::mpu6500::utils::WRITE_MASK;
+use crate::config::MPU6500Config;
+use crate::fifo::{FIFOConfig, FIFOMode};
+use crate::gyro::GyroConfig;
+use crate::interrupts::INTConfig;
+use crate::mpu6500::MPU6500;
+use crate::power_management::PowerManagementConfig;
+use crate::registers::*;
 use crate::timer::Timer;
+use crate::user_control::UserControlConfig;
+use crate::utils::WRITE_MASK;
 
 /// Indicates Bus has not been provided to the builder; thus instance cannot be built.
 pub struct NoBus;
@@ -43,7 +43,7 @@ pub struct MPU6500Builder<B, T> {
     pub bus: B,
 
     /// Provides a common interface to wait for a specified amount of time.
-    /// See [crate::timer].
+    /// See [crate::mpu6500::timer].
     pub timer: T,
 
     /// [CONFIG] register configuration.
@@ -250,7 +250,11 @@ impl<T: Bus, U: Timer> MPU6500Builder<WithBus<T>, WithTimer<U>> {
             bus.send(&bytes_to_send).await;
         }
 
-        MPU6500 { bus, timer, latest_interrupts: 0 }
+        MPU6500 {
+            bus,
+            timer,
+            latest_interrupts: 0,
+        }
     }
 }
 
