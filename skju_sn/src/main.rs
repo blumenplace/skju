@@ -29,7 +29,7 @@ use skju_peripherals::mpu6500::config::{ConfigDLPFOptions, MPU6500Config};
 use skju_peripherals::mpu6500::fifo::{FIFOConfig, FIFOMode, FIFOSensors, MAX_FIFO_BUFFER_SIZE};
 use skju_peripherals::mpu6500::gyro::GyroConfig;
 use skju_peripherals::mpu6500::interrupts::{INTConfig, INTEnableFlags, INTFlags, InterruptStatus};
-use skju_peripherals::mpu6500::registers::{INT_ENABLE, USER_CTRL, WHO_AM_I};
+use skju_peripherals::mpu6500::registers::WHO_AM_I;
 use skju_peripherals::mpu6500::user_control::UserControlConfig;
 use {defmt_rtt as _, panic_probe as _};
 
