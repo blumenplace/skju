@@ -2,12 +2,12 @@
 //!
 //! This module introduces a unified way of initializing an MPU6500 instance.
 //!
-//! Builder requires a [crate::bus::Bus] and [crate::timer::Timer] implementation to be provided to be able
+//! Builder requires a [Bus] and [Timer] implementation to be provided to be able
 //! to build MPU6500 instance.
 //!
 //! The rest of the builder fields are optional and can be omitted. Omitting the field means the related
 //! registers won't be written during initialization unless other configuration values require the
-//! register to be updated, e.g. [super::registers::USER_CTRL] must be updated when FIFO is enabled.
+//! register to be updated, e.g. [USER_CTRL] must be updated when FIFO is enabled.
 //!
 //! Before updating configured registers, the final build() method will perform a full device reset
 //! unless configured otherwise.
