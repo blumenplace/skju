@@ -1462,6 +1462,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mpu6500"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "heapless",
+]
+
+[[package]]
 name = "nu-ansi-term"
 version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2395,14 +2403,6 @@ dependencies = [
  "anyhow",
  "rand 0.9.2",
  "skju_core",
-]
-
-[[package]]
-name = "skju_peripherals"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "heapless",
 ]
 
 [[package]]

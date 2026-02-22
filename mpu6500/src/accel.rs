@@ -19,7 +19,7 @@ pub struct AccelConfig {
     pub range: AccelRange,
     pub st_flags: SelfTestFlags,
     pub dlpf_enabled: bool,
-    pub dlpf_cfg: DLPFOptions,
+    pub dlpf_cfg: AccelDLPFOptions,
 }
 
 impl AccelConfig {
@@ -33,7 +33,7 @@ impl AccelConfig {
         self
     }
 
-    pub fn dlpf(mut self, enabled: bool, cfg: DLPFOptions) -> Self {
+    pub fn dlpf(mut self, enabled: bool, cfg: AccelDLPFOptions) -> Self {
         self.dlpf_enabled = enabled;
         self.dlpf_cfg = cfg;
         self
@@ -57,7 +57,7 @@ impl Default for AccelConfig {
             range: AccelRange::G2,
             st_flags: SelfTestFlags::empty(),
             dlpf_enabled: true,
-            dlpf_cfg: DLPFOptions::Hz460,
+            dlpf_cfg: AccelDLPFOptions::Hz460,
         }
     }
 }
@@ -73,7 +73,7 @@ pub enum AccelRange {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum DLPFOptions {
+pub enum AccelDLPFOptions {
     Hz460 = 1,
     Hz184 = 2,
     Hz92 = 3,

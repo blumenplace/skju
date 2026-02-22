@@ -4,6 +4,11 @@ bitflags::bitflags! {
         const DMP_EN = 1 << 7;
         const FIFO_EN = 1 << 6;
         const I2C_MST_EN = 1 << 5;
+        const I2C_IF_DIS = 1 << 4;
+        const DMP_RST = 1 << 3;
+        const FIFO_RST = 1 << 2;
+        const I2C_MST_RST = 1 << 1;
+        const SIG_COND_RST = 1 << 0;
     }
 }
 

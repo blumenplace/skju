@@ -2,8 +2,7 @@ use embassy_nrf::gpio::Output;
 use embassy_nrf::spim::Spim;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::mutex::Mutex;
-use skju_peripherals;
-use skju_peripherals::bus::Bus;
+use mpu6500::bus::Bus;
 
 pub struct SpiDeviceBus {
     spi: Mutex<NoopRawMutex, Spim<'static>>,

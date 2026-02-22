@@ -1,14 +1,14 @@
 #[derive(Debug, Clone, Copy)]
 pub struct MPU6500Config {
     pub ext_sync: ExtSyncOptions,
-    pub dlpf_cfg: DLPFOptions,
+    pub dlpf_cfg: ConfigDLPFOptions,
 }
 
 impl Default for MPU6500Config {
     fn default() -> Self {
         Self {
             ext_sync: ExtSyncOptions::Disabled,
-            dlpf_cfg: DLPFOptions::CFG0,
+            dlpf_cfg: ConfigDLPFOptions::CFG0,
         }
     }
 }
@@ -19,13 +19,13 @@ impl MPU6500Config {
         self
     }
 
-    pub fn dlpf_cfg(mut self, dlpf_cfg: DLPFOptions) -> Self {
+    pub fn dlpf_cfg(mut self, dlpf_cfg: ConfigDLPFOptions) -> Self {
         self.dlpf_cfg = dlpf_cfg;
         self
     }
 
     pub fn bits(&self) -> u8 {
-        self.ext_sync.bits() | self.dlpf_cfg.bits()
+        0 | self.ext_sync.bits() | self.dlpf_cfg.bits()
     }
 }
 
@@ -45,13 +45,13 @@ pub enum ExtSyncOptions {
 impl ExtSyncOptions {
     pub fn bits(self) -> u8 {
         let value = self as u8;
-        value << 5
+        value << 3
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
-pub enum DLPFOptions {
+pub enum ConfigDLPFOptions {
     CFG0 = 0,
     CFG1 = 1,
     CFG2 = 2,
@@ -62,9 +62,9 @@ pub enum DLPFOptions {
     CFG7 = 7,
 }
 
-impl DLPFOptions {
+impl ConfigDLPFOptions {
     pub fn bits(self) -> u8 {
         let value = self as u8;
-        value << 2
+        value
     }
 }
