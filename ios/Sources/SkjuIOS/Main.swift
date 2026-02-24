@@ -19,13 +19,13 @@ struct OpenStreetMapApp: App {
     }
     .modelContainer(
       for: SensorItem.self,
-      configurations: [
+      /*configurations: [
         // Use our custom remote SwiftData store (iOS 18+)
         SensorStoreConfiguration(
           identifier: "SensorRemoteStore",
           baseURL: URL(string: "https://skju-sim.blumen.place")!
         )
-      ]
+      ]*/
     )
   }
 }
@@ -36,7 +36,7 @@ public struct Coordinate: Hashable {
 }
 
 @Model final public class SensorItem: Identifiable, Hashable {
-  var id: UUID
+  public var id: UUID
   var x: Double
   var y: Double
 
@@ -49,8 +49,8 @@ public struct Coordinate: Hashable {
   var coordinate: Coordinate { Coordinate(x: x, y: y) }
   var title: String { "x: \(x), y: \(y)" }
 
-  static func == (lhs: SensorItem, rhs: SensorItem) -> Bool { lhs.id == rhs.id }
-  func hash(into hasher: inout Hasher) { hasher.combine(id) }
+  public static func == (lhs: SensorItem, rhs: SensorItem) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 struct ContentView: View {
