@@ -1,0 +1,3 @@
+[bindings.swift]
+cdylib_name = "skju_common"
+module_name = "SkjuCommon"

@@ -10,9 +10,14 @@ let package = Package(
         .library(name: "SkjuIOS", targets: ["SkjuIOS"]),
     ],
     targets: [
+        .binaryTarget(
+            name: "CommontLib",
+            path: "Binaries/CommontLib.xcframework"
+        ),
         .target(
             name: "SkjuIOS",
-            path: "Sources/SkjuIOS"
+            dependencies: ["CommontLib"],
+            path: "Sources/SkjuIOS",
         )
     ]
 )
