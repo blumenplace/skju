@@ -7,125 +7,106 @@ RUST_LIB_IOS_DIR := ./target/aarch64-apple-ios/$(strip $(BUILD))
 RUST_LIB_IOS_SIM_DIR := ./target/aarch64-apple-ios-sim/$(strip $(BUILD))
 RUST_LIB_IOS := $(RUST_LIB_IOS_DIR)/libskju_common.a
 RUST_LIB_IOS_SIM := $(RUST_LIB_IOS_SIM_DIR)/libskju_common.a
-SWIFT_SOURCES := ./target/swift-build \
-	./target/swift/SkjuCommon.swift \
-	./target/swift/SkjuCommonFFI.h \
-	./target/swift/module.modulemap
 
 
+SWIFT := xcrun --sdk iphoneos swiftc
+SWIFT_SIM := xcrun --sdk iphonesimulator swiftc
 
-build: ./target/swift-build/SkjuCommon.xcframework
+SWIFT_SDK_IOS := $(shell xcrun --sdk iphoneos --show-sdk-path)
+SWIFT_SDK_SIM := $(shell xcrun --sdk iphonesimulator --show-sdk-path)
+
+SWIFT_MODULE := SkjuCommon
+SWIFT_PRODUCT := $(SWIFT_MODULE)
+SWIFT_BUILD_DIR := ./target/swift-build
+SWIFT_SRC_DIR := ./target/swift
+SWIFT_SRC := $(SWIFT_SRC_DIR)/SkjuCommon.swift \
+	$(SWIFT_SRC_DIR)/SkjuCommonFFI.h \
+	$(SWIFT_SRC_DIR)/module.modulemap
 
 
-./target/swift:
-	@echo "Ensure Swift headers folder exists..."
-	@mkdir -p ./target/swift
+define swift_build_commands
+	$(if $(findstring simulator,$(1)),$(eval SWC=$(SWIFT_SIM)),$(eval SWC=$(SWIFT)))
+	$(if $(findstring simulator,$(1)),$(eval SWIFT_TRIPLE=arm64-apple-ios-simulator),$(eval SWIFT_TRIPLE=arm64-apple-ios))
+	$(if $(findstring simulator,$(1)),$(eval SWIFT_TARGET=arm64-apple-ios18.0-simulator),$(eval SWIFT_TARGET=arm64-apple-ios18.0))
+	$(if $(findstring simulator,$(1)),$(eval RUST_LIB_DIR=$(RUST_LIB_IOS_SIM_DIR)),$(eval RUST_LIB_DIR=$(RUST_LIB_IOS_DIR)))
+	@echo "compiling Swift library for $(1)..."
+	@mkdir -p $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/Modules/$(SWIFT_MODULE).swiftmodule
+	@$(SWC) \
+		-target $(SWIFT_TARGET) \
+		-parse-as-library \
+		-module-name $(SWIFT_MODULE) \
+		-I $(SWIFT_SRC_DIR) \
+		-L $(RUST_LIB_DIR) \
+		-lskju_common \
+		-emit-library -static \
+		-emit-module -emit-module-path $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/Modules/$(SWIFT_MODULE).swiftmodule/$(SWIFT_TRIPLE).swiftmodule \
+		-emit-module-interface -emit-module-interface-path $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/Modules/$(SWIFT_MODULE).swiftmodule/$(SWIFT_TRIPLE).swiftinterface \
+		-enable-library-evolution \
+		-module-cache-path $(SWIFT_BUILD_DIR)/ModuleCache \
+		-o $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/$(SWIFT_PRODUCT) \
+		$(SWIFT_SRC_DIR)/$(SWIFT_MODULE).swift
+	@echo "merging Rust static library into Swift static library for $(1)..."
+	@xcrun libtool -static \
+		-o $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/$(SWIFT_PRODUCT).merged \
+		$(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/$(SWIFT_PRODUCT) \
+		$(RUST_LIB_DIR)/libskju_common.a
+	@mv $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/$(SWIFT_PRODUCT).merged \
+		$(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/$(SWIFT_PRODUCT)
+	@xcrun ranlib $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/$(SWIFT_PRODUCT)
+endef
 
 
-$(RUST_LIB_IOS_SIM): ./target/swift
-	@echo "Building static libraries for iOS simulator..."
+$(SWIFT_BUILD_DIR):
+	@echo "ensure Swift build directory folder exists..."
+	@mkdir -p $(SWIFT_BUILD_DIR)
+
+
+$(RUST_LIB_IOS_SIM): ./src/lib.rs
+	@echo "building static libraries for iOS simulator..."
 	@cargo build $(strip $(IOS_PARAMS)) --target aarch64-apple-ios-sim
 
 
-$(RUST_LIB_IOS): ./target/swift
-	@echo "Building static libraries for iOS..."
+$(RUST_LIB_IOS): ./src/lib.rs
+	@echo "building static libraries for iOS..."
 	@cargo build $(strip $(IOS_PARAMS)) --target aarch64-apple-ios
 
 
-./target/swift/SkjuCommon.swift: $(RUST_LIB_IOS)
-	@echo "Generate Swift sources..."
-	@uniffi-bindgen-swift $(RUST_LIB_IOS) ./target/swift --swift-sources
-
-
-./target/swift/SkjuCommonFFI.h: $(RUST_LIB_IOS)
-	@echo "Generate Swift FFI interface..."
-	@uniffi-bindgen-swift $(RUST_LIB_IOS) ./target/swift --headers
-
-
-./target/swift/module.modulemap: $(RUST_LIB_IOS)
-	@echo "Generate Swifti modulemap..."
+$(SWIFT_SRC): $(RUST_LIB_IOS)
+	@echo "generate Swift sources..."
+	@uniffi-bindgen-swift $(RUST_LIB_IOS) $(SWIFT_SRC_DIR) --swift-sources
 	@uniffi-bindgen-swift $(RUST_LIB_IOS) \
-		./target/swift \
-		--modulemap \
-		--module-name SkjuCommonFFI \
+		$(SWIFT_SRC_DIR)/Headers \
+		--headers \
+		--module-name $(SWIFT_MODULE)FFI
+	@uniffi-bindgen-swift $(RUST_LIB_IOS) \
+		$(SWIFT_SRC_DIR) \
+		--xcframework --modulemap \
+		--module-name $(SWIFT_MODULE)FFI \
 		--modulemap-filename module.modulemap
 
 
-./target/swift-build:
-	@echo "Creating output directory for iPhone simulator..."
-	@mkdir -p ./target/swift-build
+swift-build-ios: $(RUST_LIB_IOS) $(SWIFT_SRC)
+	$(call swift_build_commands,arm64-apple-ios18.0)
 
 
-
-SWIFT_MODULE := SkjuCommon
-SWIFT_PRODUCT := lib$(SWIFT_MODULE).a
-SWIFT_BUILD_DIR := ./target/swift-build
-
-swift-build-ios: $(RUST_LIB_IOS) ./target/swift-build $(SWIFT_SOURCES)
-	@echo "Compiling Swift library for iOS"
-	@xcrun -sdk iphoneos swiftc \
-		-target arm64-apple-ios18.0 \
-		-parse-as-library \
-		-module-name SkjuCommon \
-		-I ./target/swift \
-		-Xcc -I./target/swift \
-		-L $(RUST_LIB_IOS_DIR) \
-		-lcommont \
-		-emit-library -static \
-		-emit-module \
-		-emit-module-path ./target/swift-build/ios/Modules/SkjuCommon.swiftmodule/arm64-apple-ios.swiftmodule \
-		-emit-module-interface \
-  		-emit-module-interface-path ./target/swift-build/ios/Modules/SkjuCommon.swiftmodule/arm64-apple-ios.swiftinterface \
-		-enable-library-evolution \
-		-module-cache-path ./target/module-cache-swift \
-		-o ./target/swift-build/ios/libSkjuCommon.a \
-		./target/swift/SkjuCommon.swift
+swift-build-ios-sim: $(RUST_LIB_IOS_SIM) $(SWIFT_SRC)
+	$(call swift_build_commands,arm64-apple-ios18.0-simulator)
 
 
-swift-build-ios-sim: $(RUST_LIB_IOS_SIM) ./target/swift-build $(SWIFT_SOURCES)
-	@echo "Compiling Swift library for iOS simulator..."
-	@xcrun -sdk iphonesimulator swiftc \
-		-target arm64-apple-ios18.0-simulator \
-		-parse-as-library \
-		-module-name SkjuCommon \
-		-I ./target/swift \
-		-Xcc -I./target/swift \
-		-L $(RUST_LIB_IOS_SIM_DIR) \
-		-lcommont \
-		-emit-library -static \
-		-emit-module \
-		-emit-module-path ./target/swift-build/ios-sim/Modules/SkjuCommon.swiftmodule/arm64-apple-ios-simulator.swiftmodule \
-		-emit-module-interface \
-  		-emit-module-interface-path ./target/swift-build/ios-sim/Modules/SkjuCommon.swiftmodule/arm64-apple-ios-simulator.swiftinterface \
-		-enable-library-evolution \
-		-module-cache-path ./target/module-cache-swift \
-		-o ./target/swift-build/ios-sim/libSkjuCommon.a \
-		./target/swift/SkjuCommon.swift
-
-
-./target/swift-build/SkjuCommon.xcframework: swift-build-ios-sim swift-build-ios
-	@echo "Swift build complete"
-	@echo "Generating XCFramework..."
+$(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework: swift-build-ios swift-build-ios-sim
+	@rm -rf $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework
 	@xcodebuild -create-xcframework \
-		-library ./target/swift-build/ios/libSkjuCommon.a \
-		-library ./target/swift-build/ios-sim/libSkjuCommon.a \
-		-output ./target/swift-build/SkjuCommon.xcframework
+		-framework $(SWIFT_BUILD_DIR)/arm64-apple-ios18.0-simulator/$(SWIFT_MODULE).framework \
+		-framework $(SWIFT_BUILD_DIR)/arm64-apple-ios18.0/$(SWIFT_MODULE).framework \
+		-output $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework
+	@cp $(SWIFT_SRC_DIR)/module.modulemap $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework/ios-arm64-simulator/$(SWIFT_MODULE).framework/Modules
+	@cp -R $(SWIFT_SRC_DIR)/Headers $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework/ios-arm64-simulator/$(SWIFT_MODULE).framework/
+	@cp $(SWIFT_SRC_DIR)/module.modulemap $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework/ios-arm64/$(SWIFT_MODULE).framework/Modules
+	@cp -R $(SWIFT_SRC_DIR)/Headers $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework/ios-arm64/$(SWIFT_MODULE).framework/
 
 
-.PHONY: swift-build
-swift-build: ./target/swift-build/SkjuCommon.xcframework
-	@echo "Swift build complete"
-
-
-# ./target/CommontLib.xcframework: ./target/aarch64-apple-ios/$(strip $(BUILD))/libcommont.a ./target/aarch64-apple-ios-sim/$(strip $(BUILD))/libcommont.a $(SWIFT_SOURCES)
-# 	@echo "Create XCFramework"
-# 	@rm -rf ./target/CommontLib.xcframework
-# 	@xcodebuild -create-xcframework \
-#   		-library ./target/aarch64-apple-ios-sim/$(strip $(BUILD))/libcommont.a \
-#   		-headers ./target/swift \
-# 		-library ./target/aarch64-apple-ios/$(strip $(BUILD))/libcommont.a \
-# 		-headers ./target/swift \
-# 		-output ./target/CommontLib.xcframework
+xcframework: $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework
+	@echo "xcframework generated at $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework"
 
 
 .PHONY: fmt
@@ -134,7 +115,13 @@ fmt:
 	@cargo fmt --check
 
 
+.PHONY: swift-clean
+swift-clean:
+	@rm -rf $(SWIFT_SRC_DIR)
+	@rm -rf $(SWIFT_BUILD_DIR)
+
+
 .PHONY: clean
-clean:
+clean: swift-clean
 	@rm -rf ./target
 	@cargo clean
