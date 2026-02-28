@@ -17,8 +17,8 @@ SWIFT_SDK_SIM := $(shell xcrun --sdk iphonesimulator --show-sdk-path)
 
 SWIFT_MODULE := SkjuCommon
 SWIFT_PRODUCT := $(SWIFT_MODULE)
-SWIFT_BUILD_DIR := ./target/swift-build
-SWIFT_SRC_DIR := ./target/swift
+SWIFT_BUILD_DIR := ./target/SkjuCommon-build
+SWIFT_SRC_DIR := ./target/SkjuCommon-sources
 SWIFT_SRC := $(SWIFT_SRC_DIR)/SkjuCommon.swift \
 	$(SWIFT_SRC_DIR)/SkjuCommonFFI.h \
 	$(SWIFT_SRC_DIR)/module.modulemap
@@ -45,6 +45,9 @@ define swift_build_commands
 		-module-cache-path $(SWIFT_BUILD_DIR)/ModuleCache \
 		-o $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/$(SWIFT_PRODUCT) \
 		$(SWIFT_SRC_DIR)/$(SWIFT_MODULE).swift
+	@mkdir -p $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/Headers
+	@cp -R $(SWIFT_SRC_DIR)/Headers/* $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/Headers/
+	@cp $(SWIFT_SRC_DIR)/module.modulemap $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/Modules/module.modulemap
 	@echo "merging Rust static library into Swift static library for $(1)..."
 	@xcrun libtool -static \
 		-o $(SWIFT_BUILD_DIR)/$(1)/$(SWIFT_MODULE).framework/$(SWIFT_PRODUCT).merged \
@@ -99,10 +102,6 @@ $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework: swift-build-ios swift-build-ios-
 		-framework $(SWIFT_BUILD_DIR)/arm64-apple-ios18.0-simulator/$(SWIFT_MODULE).framework \
 		-framework $(SWIFT_BUILD_DIR)/arm64-apple-ios18.0/$(SWIFT_MODULE).framework \
 		-output $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework
-	@cp $(SWIFT_SRC_DIR)/module.modulemap $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework/ios-arm64-simulator/$(SWIFT_MODULE).framework/Modules
-	@cp -R $(SWIFT_SRC_DIR)/Headers $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework/ios-arm64-simulator/$(SWIFT_MODULE).framework/
-	@cp $(SWIFT_SRC_DIR)/module.modulemap $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework/ios-arm64/$(SWIFT_MODULE).framework/Modules
-	@cp -R $(SWIFT_SRC_DIR)/Headers $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework/ios-arm64/$(SWIFT_MODULE).framework/
 
 
 xcframework: $(SWIFT_BUILD_DIR)/$(SWIFT_MODULE).xcframework
@@ -125,3 +124,14 @@ swift-clean:
 clean: swift-clean
 	@rm -rf ./target
 	@cargo clean
+
+
+check-swc: xcframework
+	@echo "import SkjuCommon\n" > $(SWIFT_BUILD_DIR)/demo.swift
+	@xcrun -sdk iphonesimulator swiftc \
+		-target arm64-apple-ios18.0-simulator \
+		-F $(SWIFT_BUILD_DIR)/SkjuCommon.xcframework/ios-arm64-simulator \
+		-I $(SWIFT_SRC_DIR) \
+		-framework SkjuCommon \
+		-o $(SWIFT_BUILD_DIR)/demo.swift.o \
+		$(SWIFT_BUILD_DIR)/demo.swift
