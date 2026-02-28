@@ -1,9 +1,12 @@
-APP_NAME=SkjuIOS
+APP_NAME=SkjuSimulator
 BUNDLE_ID=place.blumen.skju
 SIMULATOR_NAME="iPad"
 ARCH=$(shell uname -m)
 
 SDK_PATH := $(shell xcrun --sdk iphonesimulator --show-sdk-path 2>/dev/null)
+
+SKJU_COMMON_BUILD_DIR := ../common/target/swift-build
+SKJU_COMMON_XCFRAMEWORK := $(strip $(SKJU_COMMON_BUILD_DIR))/SkjuCommon.xcframework
 
 ifeq ($(strip $(SDK_PATH)),)
     XCODE_DEV_DIR := /Applications/Xcode.app/Contents/Developer
@@ -17,70 +20,79 @@ endif
 all: run
 
 
-Binaries/CommontLib.xcframework:
-	#@cd ../commont && make swift-build
-	#@cp -r ../commont/target/swift-build/CommontLib.xcframework Binaries/
-	@echo "Do nothing for now"
-
-
 $(APP_NAME).app/Info.plist:
 	@mkdir -p $(APP_NAME).app
-	@echo "Generate $(APP_NAME).app/Info.plist"
-	@echo '<?xml version="1.0" encoding="UTF-8"?>' > $(APP_NAME).app/Info.plist
-	@echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $(APP_NAME).app/Info.plist
-	@echo '<plist version="1.0"><dict>' >> $(APP_NAME).app/Info.plist
-	@echo '    <key>CFBundleExecutable</key><string>$(APP_NAME)</string>' >> $(APP_NAME).app/Info.plist
-	@echo '    <key>CFBundleIdentifier</key><string>$(BUNDLE_ID)</string>' >> $(APP_NAME).app/Info.plist
-	@echo '    <key>CFBundleShortVersionString</key><string>1.0</string>' >> $(APP_NAME).app/Info.plist
-	@echo '    <key>CFBundleVersion</key><string>1</string>' >> $(APP_NAME).app/Info.plist
-	@echo '    <key>LSRequiresIPhoneOS</key><true/>' >> $(APP_NAME).app/Info.plist
-	@echo '    <key>UIDeviceFamily</key>' >> $(APP_NAME).app/Info.plist
-	@echo '    <array>' >> $(APP_NAME).app/Info.plist
-	@echo '        <integer>2</integer>' >> $(APP_NAME).app/Info.plist
-	@echo '    </array>' >> $(APP_NAME).app/Info.plist
-	@echo '    <key>UILaunchScreen</key><dict/>' >> $(APP_NAME).app/Info.plist
-	@echo '    <key>LSMinimumSystemVersion</key>' >> $(APP_NAME).app/Info.plist
-	@echo '    <string>18.0</string>' >> $(APP_NAME).app/Info.plist
-	@echo '</dict></plist>' >> $(APP_NAME).app/Info.plist
+	@{ \
+		echo '<?xml version="1.0" encoding="UTF-8"?>'; \
+		echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'; \
+		echo '<plist version="1.0"><dict>'; \
+		echo '    <key>CFBundleExecutable</key><string>$(APP_NAME)</string>'; \
+		echo '    <key>CFBundleIdentifier</key><string>$(BUNDLE_ID)</string>'; \
+		echo '    <key>CFBundleShortVersionString</key><string>1.0</string>'; \
+		echo '    <key>CFBundleVersion</key><string>1</string>'; \
+		echo '    <key>LSRequiresIPhoneOS</key><true/>'; \
+		echo '    <key>UIDeviceFamily</key>'; \
+		echo '    <array>'; \
+		echo '        <integer>2</integer>'; \
+		echo '    </array>'; \
+		echo '    <key>UILaunchScreen</key><dict/>'; \
+		echo '    <key>LSMinimumSystemVersion</key>'; \
+		echo '    <string>18.0</string>'; \
+		echo '</dict></plist>'; \
+	} > $(APP_NAME).app/Info.plist
+	@echo "generated $(APP_NAME).app/Info.plist"
 
 
-build: Binaries/CommontLib.xcframework $(APP_NAME).app/Info.plist
-	@echo "Building for $(ARCH) using SDK at $(SDK_PATH)..."
+
+build: $(APP_NAME).app/Info.plist
+	@echo "building for $(ARCH) using SDK at $(SDK_PATH)..."
 	@if [ -z "$(SDK_PATH)" ]; then \
 		echo "Error: SDK Path not found."; \
 		echo "1. Ensure Xcode is installed from the App Store."; \
 		echo "2. Run 'sudo xcode-select -s /Applications/Xcode.app' to select it."; \
 		exit 1; \
 	fi
-	@echo "Compile SkjuIOS simulator app"
-	@xcrun -sdk iphonesimulator swiftc Sources/SkjuIOS/Main.swift \
+	@echo "compile $(APP_NAME)"
+	@echo "SEARCH: $(SKJU_COMMON_XCFRAMEWORK)/ios-arm64-simulator"
+	@xcrun -sdk iphonesimulator swiftc \
 		-target arm64-apple-ios18.0-simulator \
 		-parse-as-library \
-		-F Binaries \
-		-framework CommontLib \
-		-o $(APP_NAME).app/$(APP_NAME)
+		-F $(SKJU_COMMON_BUILD_DIR) \
+		-F $(SKJU_COMMON_XCFRAMEWORK)/ios-arm64-simulator \
+		-framework SkjuCommon \
+		-o $(APP_NAME).app/$(APP_NAME) \
+		Sources/$(APP_NAME)/Main.swift
+
+
+# Does not work: -I $(SKJU_COMMON_XCFRAMEWORK)/ios-arm64-simulator/SkjuCommon.framework/Headers \
+# module SkjuCommonFFI [system] {
+# umbrella "SkjuCommonFFI.h"
+# export *
+# }
+# Or with umbrella directory:
+# module SkjuCommonFFI { umbrella header "SkjuCommonFFI.h"; export *; }
 
 
 .PHONY: boot
 boot:
-	@echo "Booting Simulator..."
+	@echo "booting simulator..."
 	xcrun simctl boot $(SIMULATOR_NAME) || true
 
 
 .PHONY: install
 install:
-	@echo "Installing App..."
+	@echo "installing $(APP_NAME)..."
 	xcrun simctl install $(SIMULATOR_NAME) $(APP_NAME).app
 
 
 .PHONY: launch
 launch:
-	@echo "Launching App..."
+	@echo "launching $(APP_NAME)..."
 	xcrun simctl launch $(SIMULATOR_NAME) $(BUNDLE_ID)
 
 
 fmt:
-	xcrun swift-format --in-place ./Sources/SkjuIOS/Main.swift
+	xcrun swift-format --in-place ./Sources/$(APP_NAME)/Main.swift
 
 
 .PHONY: run
@@ -89,7 +101,5 @@ run: fmt build boot install launch
 
 .PHONY: clean
 clean:
-	@echo "Cleaning build directories..."
+	@echo "cleaning build directories..."
 	@rm -rf $(APP_NAME).app
-	@rm -rf ./Binaries
-	@rm -rf ./Sources/CommontLib
