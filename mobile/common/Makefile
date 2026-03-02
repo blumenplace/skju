@@ -127,11 +127,17 @@ clean: swift-clean
 
 
 check-swc: xcframework
-	@echo "import SkjuCommon\n" > $(SWIFT_BUILD_DIR)/demo.swift
+	@{ \
+		echo "import SkjuCommon"; \
+		echo 'print("hello")'; \
+		echo 'let x = try! MapDrawing(ctx: 0, height: 800.0)'; \
+  	} > $(SWIFT_BUILD_DIR)/demo.swift
 	@xcrun -sdk iphonesimulator swiftc \
 		-target arm64-apple-ios18.0-simulator \
 		-F $(SWIFT_BUILD_DIR)/SkjuCommon.xcframework/ios-arm64-simulator \
 		-I $(SWIFT_SRC_DIR) \
 		-framework SkjuCommon \
+		-framework CoreGraphics \
+		-framework CoreFoundation \
 		-o $(SWIFT_BUILD_DIR)/demo.swift.o \
 		$(SWIFT_BUILD_DIR)/demo.swift
