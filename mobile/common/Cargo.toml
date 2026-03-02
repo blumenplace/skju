@@ -10,5 +10,10 @@ crate-type = ["staticlib"]
 [dependencies]
 uniffi = { version = "0.31.0", features = [ "build", "bindgen" ] }
 
+thiserror = "2.0.18"
+piet = { git = "https://github.com/blumenplace/piet", branch = "bump_cg_version" }
+piet-coregraphics =  { git = "https://github.com/blumenplace/piet", branch = "bump_cg_version" }
+core-graphics = "0.25.0"
+
 [build-dependencies]
 uniffi = { version = "0.31.0", features = [ "build", "bindgen" ] }
