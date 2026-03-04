@@ -2,22 +2,30 @@
 import PackageDescription
 
 let package = Package(
-    name: "SkjuIOS",
+    name: "SkjuSimulator",
     platforms: [
         .iOS(.v18)
     ],
     products: [
-        .library(name: "SkjuIOS", targets: ["SkjuIOS"]),
+        .executable(name: "SkjuSimulator", targets: ["SkjuSimulator"]),
     ],
     targets: [
         .binaryTarget(
-            name: "CommontLib",
-            path: "Binaries/CommontLib.xcframework"
+            name: "SkjuCommon",
+            path: "../common/target/SkjuCommon-build/SkjuCommon.xcframework"
         ),
-        .target(
-            name: "SkjuIOS",
-            dependencies: ["CommontLib"],
-            path: "Sources/SkjuIOS",
+        .executableTarget(
+            name: "SkjuSimulator",
+            dependencies: ["SkjuCommon"],
+            path: "src/SkjuSimulator",
+            linkerSettings: [
+                .linkedFramework("UIKit"),
+                .linkedFramework("Foundation"),
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("CoreText"),
+                .linkedFramework("CoreImage"),
+                .linkedFramework("CoreAnimation")
+            ]
         )
     ]
 )
