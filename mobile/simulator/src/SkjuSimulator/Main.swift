@@ -218,6 +218,61 @@ struct AddSensorView: View {
   }
 }
 
+extension MKMapRect {
+  init(for region: MKCoordinateRegion) {
+    let topLeft = CLLocationCoordinate2D(
+      latitude: region.center.latitude + region.span.latitudeDelta / 2,
+      longitude: region.center.longitude - region.span.longitudeDelta / 2
+    )
+    let bottomRight = CLLocationCoordinate2D(
+      latitude: region.center.latitude - region.span.latitudeDelta / 2,
+      longitude: region.center.longitude + region.span.longitudeDelta / 2
+    )
+    let a = MKMapPoint(topLeft)
+    let b = MKMapPoint(bottomRight)
+    self = MKMapRect(
+      x: min(a.x, b.x),
+      y: min(a.y, b.y),
+      width: abs(a.x - b.x),
+      height: abs(a.y - b.y)
+    )
+  }
+}
+
+final class QuakeOverlay: NSObject, MKOverlay {
+  let boundingMapRect: MKMapRect
+  let coordinate: CLLocationCoordinate2D
+
+  init(region: MKCoordinateRegion) {
+    self.boundingMapRect = MKMapRect(for: region)
+    self.coordinate = region.center
+    super.init()
+  }
+}
+
+final class QuakeRenderer: MKOverlayRenderer {
+  override func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
+    // Convert a map rect to view rect
+    let rect = self.rect(for: overlay.boundingMapRect)
+
+    // Example Core Graphics drawing
+    context.setFillColor(UIColor.systemRed.withAlphaComponent(0.15).cgColor)
+    context.fill(rect)
+
+    // Draw a stroked circle at a map coordinate
+    let centerCoord = overlay.coordinate
+    let centerPoint = self.point(for: MKMapPoint(centerCoord))
+    let radius: CGFloat = 60 / zoomScale  // scale with zoom to keep visual size reasonable
+    context.setStrokeColor(UIColor.systemRed.cgColor)
+    context.setLineWidth(2 / zoomScale)
+    context.strokeEllipse(
+      in: CGRect(
+        x: centerPoint.x - radius,
+        y: centerPoint.y - radius,
+        width: radius * 2, height: radius * 2))
+  }
+}
+
 struct MapView: UIViewRepresentable {
   var sensors: [SensorItem] = []
   var selectedCoordinate: Coordinate? = nil
@@ -232,6 +287,10 @@ struct MapView: UIViewRepresentable {
     let overlay = MKTileOverlay(urlTemplate: template)
     overlay.canReplaceMapContent = true
     mapView.addOverlay(overlay, level: .aboveLabels)
+
+    let quakeOverlay = QuakeOverlay(region: mapView.region)
+    mapView.addOverlay(quakeOverlay, level: .aboveLabels)
+
     mapView.delegate = context.coordinator
 
     // Add context menu interaction to show a popup near the press location
