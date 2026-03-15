@@ -18,6 +18,7 @@ use krafka::producer::Producer;
 
 mod dtos;
 mod models;
+mod events;
 
 pub(crate) use models::*;
 
@@ -115,8 +116,9 @@ where
 
         inbound.extend_from_slice(&read_buf[..n]);
 
-        let _ = &mut mqtt;
-        let _ = &mut inbound;
+        // let _ = &mut mqtt;
+        // let _ = &mut inbound;
+        todo!();
     }
 
     todo!()
