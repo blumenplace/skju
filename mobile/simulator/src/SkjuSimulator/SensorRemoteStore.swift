@@ -9,7 +9,10 @@ public struct SensorsStoreConfiguration: DataStoreConfiguration, Hashable, Senda
   public var name: String
   public let baseURL: URL
 
-  public init(name: String = "SensorsRemoteStore", schema: Schema, baseURL: URL = URL(string: "https://skju-sim.blumen.place")!) {
+  public init(
+    name: String = "SensorsRemoteStore", schema: Schema,
+    baseURL: URL = URL(string: "https://skju-sim.blumen.place")!
+  ) {
     self.name = name
     self.schema = schema
     self.baseURL = baseURL
@@ -29,7 +32,10 @@ public struct SensorSnapshot: DataStoreSnapshot {
     self.y = y
   }
 
-  public init(from backing: any BackingData, relatedBackingDatas: inout [PersistentIdentifier: any BackingData]) {
+  public init(
+    from backing: any BackingData,
+    relatedBackingDatas: inout [PersistentIdentifier: any BackingData]
+  ) {
     let pid = backing.persistentModelID!
     let id: UUID = backing.getValue(forKey: \SensorItem.id)
     let x: Double = backing.getValue(forKey: \SensorItem.x)
@@ -37,7 +43,10 @@ public struct SensorSnapshot: DataStoreSnapshot {
     self.init(persistentIdentifier: pid, id: id, x: x, y: y)
   }
 
-  public func copy(persistentIdentifier: PersistentIdentifier, remappedIdentifiers: [PersistentIdentifier : PersistentIdentifier]?) -> SensorSnapshot {
+  public func copy(
+    persistentIdentifier: PersistentIdentifier,
+    remappedIdentifiers: [PersistentIdentifier: PersistentIdentifier]?
+  ) -> SensorSnapshot {
     SensorSnapshot(persistentIdentifier: persistentIdentifier, id: id, x: x, y: y)
   }
 }
@@ -52,7 +61,9 @@ public final class SensorsRemoteStore: DataStore {
 
   private let sim: SimDataStore
 
-  public required init(_ configuration: Configuration, migrationPlan: SchemaMigrationPlan.Type?) throws {
+  public required init(_ configuration: Configuration, migrationPlan: SchemaMigrationPlan.Type?)
+    throws
+  {
     self.configuration = configuration
     self.identifier = configuration.identifier
     self.schema = Schema([SensorItem.self])
@@ -69,9 +80,12 @@ public final class SensorsRemoteStore: DataStore {
     // No bulk erase endpoint; ignore for now.
   }
 
-  public func fetch<T>(_ request: DataStoreFetchRequest<T>) throws -> DataStoreFetchResult<T, Snapshot> where T : PersistentModel {
+  public func fetch<T>(_ request: DataStoreFetchRequest<T>) throws -> DataStoreFetchResult<
+    T, Snapshot
+  > where T: PersistentModel {
     guard T.self == SensorItem.self else {
-      return DataStoreFetchResult(descriptor: request.descriptor, fetchedSnapshots: [], relatedSnapshots: [:])
+      return DataStoreFetchResult(
+        descriptor: request.descriptor, fetchedSnapshots: [], relatedSnapshots: [:])
     }
 
     // Load synchronously by bridging async call
@@ -97,18 +111,24 @@ public final class SensorsRemoteStore: DataStore {
     let limit = request.descriptor.fetchLimit
     let sliced = Array(snapshots.dropFirst(offset).prefix(limit == 0 ? Int.max : limit))
 
-    return DataStoreFetchResult(descriptor: request.descriptor, fetchedSnapshots: sliced, relatedSnapshots: [:])
+    return DataStoreFetchResult(
+      descriptor: request.descriptor, fetchedSnapshots: sliced, relatedSnapshots: [:])
   }
 
-  public func fetchCount<T>(_ request: DataStoreFetchRequest<T>) throws -> Int where T : PersistentModel {
+  public func fetchCount<T>(_ request: DataStoreFetchRequest<T>) throws -> Int
+  where T: PersistentModel {
     try fetch(request).fetchedSnapshots.count
   }
 
-  public func fetchIdentifiers<T>(_ request: DataStoreFetchRequest<T>) throws -> [PersistentIdentifier] where T : PersistentModel {
+  public func fetchIdentifiers<T>(_ request: DataStoreFetchRequest<T>) throws
+    -> [PersistentIdentifier] where T: PersistentModel
+  {
     try fetch(request).fetchedSnapshots.map { $0.persistentIdentifier }
   }
 
-  public func save(_ request: DataStoreSaveChangesRequest<Snapshot>) throws -> DataStoreSaveChangesResult<Snapshot> {
+  public func save(_ request: DataStoreSaveChangesRequest<Snapshot>) throws
+    -> DataStoreSaveChangesResult<Snapshot>
+  {
     // Bridge async
     var saveError: Error?
     let sem = DispatchSemaphore(value: 0)
@@ -128,11 +148,11 @@ public final class SensorsRemoteStore: DataStore {
     return DataStoreSaveChangesResult(for: identifier)
   }
 
-//  public func initializeState(for editingState: EditingState) { }
-//
-//  public func invalidateState(for editingState: EditingState) { }
-//
-//  public func cachedSnapshots(for persistentIdentifiers: [PersistentIdentifier], editingState: EditingState) throws -> [PersistentIdentifier : Snapshot] {
-//    [:]
-//  }
+  //  public func initializeState(for editingState: EditingState) { }
+  //
+  //  public func invalidateState(for editingState: EditingState) { }
+  //
+  //  public func cachedSnapshots(for persistentIdentifiers: [PersistentIdentifier], editingState: EditingState) throws -> [PersistentIdentifier : Snapshot] {
+  //    [:]
+  //  }
 }

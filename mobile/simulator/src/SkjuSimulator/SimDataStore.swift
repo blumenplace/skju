@@ -1,8 +1,9 @@
 import Foundation
 import OSLog
 
-private extension Logger {
-  static let simStore = Logger(subsystem: Bundle.main.bundleIdentifier ?? "SkjuIOS", category: "SimDataStore")
+extension Logger {
+  fileprivate static let simStore = Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "SkjuIOS", category: "SimDataStore")
 }
 
 /// A lightweight HTTP-backed store for `SensorItem` using JSON.
@@ -30,7 +31,9 @@ public actor SimDataStore {
   private let jsonEncoder: JSONEncoder
   private let jsonDecoder: JSONDecoder
 
-  public init(baseURL: URL = URL(string: "https://skju-sim.blumen.place")!, session: URLSession = .shared) {
+  public init(
+    baseURL: URL = URL(string: "https://skju-sim.blumen.place")!, session: URLSession = .shared
+  ) {
     self.baseURL = baseURL
     self.session = session
     self.jsonEncoder = JSONEncoder()
@@ -47,7 +50,9 @@ public actor SimDataStore {
   ///   - inserted: items to create remotely
   ///   - updated: items to update remotely
   ///   - deleted: items to delete remotely
-  public func save(inserted: [SensorItem], updated: [SensorItem], deleted: [SensorItem]) async throws {
+  public func save(inserted: [SensorItem], updated: [SensorItem], deleted: [SensorItem])
+    async throws
+  {
     // Insert
     if !inserted.isEmpty {
       let payload = inserted.map { SensorDTO(id: $0.id, x: $0.x, y: $0.y) }
@@ -67,19 +72,23 @@ public actor SimDataStore {
   }
 
   private func get<T: Decodable>(path: String) async throws -> T {
-    let url = baseURL.appendingPathComponent(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+    let url = baseURL.appendingPathComponent(
+      path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
     var req = URLRequest(url: url)
     req.httpMethod = "GET"
     req.setValue("application/json", forHTTPHeaderField: "Accept")
     do {
       let (data, resp) = try await session.data(for: req)
-      guard let http = resp as? HTTPURLResponse else { throw Error.transport(URLError(.badServerResponse)) }
+      guard let http = resp as? HTTPURLResponse else {
+        throw Error.transport(URLError(.badServerResponse))
+      }
       guard (200..<300).contains(http.statusCode) else {
         Logger.simStore.error("GET failed: status=\(http.statusCode)")
         throw Error.server(status: http.statusCode)
       }
-      do { return try jsonDecoder.decode(T.self, from: data) }
-      catch { throw Error.decodingFailed(error) }
+      do { return try jsonDecoder.decode(T.self, from: data) } catch {
+        throw Error.decodingFailed(error)
+      }
     } catch { throw Error.transport(error) }
   }
 
@@ -92,13 +101,16 @@ public actor SimDataStore {
   }
 
   private func delete(path: String) async throws {
-    let url = baseURL.appendingPathComponent(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+    let url = baseURL.appendingPathComponent(
+      path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
     var req = URLRequest(url: url)
     req.httpMethod = "DELETE"
     req.setValue("application/json", forHTTPHeaderField: "Accept")
     do {
       let (_, resp) = try await session.data(for: req)
-      guard let http = resp as? HTTPURLResponse else { throw Error.transport(URLError(.badServerResponse)) }
+      guard let http = resp as? HTTPURLResponse else {
+        throw Error.transport(URLError(.badServerResponse))
+      }
       guard (200..<300).contains(http.statusCode) else {
         Logger.simStore.error("DELETE failed: status=\(http.statusCode)")
         throw Error.server(status: http.statusCode)
@@ -107,7 +119,8 @@ public actor SimDataStore {
   }
 
   private func sendWithBody<T: Encodable>(path: String, method: String, body: T) async throws {
-    let url = baseURL.appendingPathComponent(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+    let url = baseURL.appendingPathComponent(
+      path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
     var req = URLRequest(url: url)
     req.httpMethod = method
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -119,7 +132,9 @@ public actor SimDataStore {
     }
     do {
       let (_, resp) = try await session.data(for: req)
-      guard let http = resp as? HTTPURLResponse else { throw Error.transport(URLError(.badServerResponse)) }
+      guard let http = resp as? HTTPURLResponse else {
+        throw Error.transport(URLError(.badServerResponse))
+      }
       guard (200..<300).contains(http.statusCode) else {
         Logger.simStore.error("\(method) failed: status=\(http.statusCode)")
         throw Error.server(status: http.statusCode)
