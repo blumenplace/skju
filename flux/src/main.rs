@@ -1,8 +1,8 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use mqtt_protocol_core::mqtt::{
     Connection, Version,
-    connection::{TimerKind, Event, role::Server},
-    result_code::MqttError,
+    connection::{Event, role::Server},
+    common::Cursor as MqttCursor,
 };
 use rama::{
     Context,
@@ -15,9 +15,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use krafka::producer::Producer;
+use mqtt_protocol_core::mqtt::packet::GenericPacket;
 
-
-mod dtos;
+mod pods;
 mod models;
 mod events;
 
@@ -34,6 +34,8 @@ static FLUX_KAFKA_BROKERS_DEFAULT: &str = "localhost:9092";
 static FLUX_KAFKA_TOPIC: &str = "events";
 
 static FLUX_KAFKA_TOPIC_DEFAULT: &str = "events";
+
+const EVENTS_TOPIC: &'static str = "evt";
 
 fn setup_opentelemetry() {
     let provider = opentelemetry_sdk::metrics::SdkMeterProvider::builder().build();
@@ -111,7 +113,7 @@ where
     loop {
         let n = stream.read(&mut read_buf).await?;
         if n == 0 {
-            tracing::info!("client disconnected");
+            tracing::info!("mqtt client disconnected");
             let left_events = server.notify_closed();
             todo!("left_events...");
             return Ok(());
@@ -120,32 +122,44 @@ where
         inbound.extend_from_slice(&read_buf[..n]);
 
         loop {
-            let mut cursor = mqtt_protocol_core::mqtt::common::Cursor::new(&inbound[..]);
+            let mut cursor = MqttCursor::new(&inbound[..]);
             let events = server.recv(&mut cursor);
             if events.is_empty() {
                 break;
             }
 
-            let mut consumed = 0usize;
-
             for event in events {
                 match event {
+                    Event::NotifyPacketReceived(packet) => {
+                        tracing::info!(?packet, "received mqtt packet");
+                        match packet {
+                            GenericPacket::<u16>::V5_0Publish(publish) => {
+                                let topic = publish.topic_name();
+                                match topic {
+                                    EVENTS_TOPIC => {
+                                        let payload = publish.payload().as_slice();
+                                        let event: &pods::Event = bytemuck::try_from_bytes(payload).map_err(|e| anyhow!(e))?;
+                                        todo!("write data to Kafka");
+                                    },
+                                    _ => {
+                                        tracing::warn!(topic = ?topic, "received non-events topic");
+                                    }
+                                }
+                            }
+                            other => {
+                                tracing::info!(?other, "received non-publish packet");
+                            }
+                        }
+
+                    },
                     Event::RequestSendPacket {
                         packet,
                         release_packet_id_if_send_error,
                     } => {
-                        // consumed = consumed.max(bytes_consumed);
-                        //
-                        // let encoded = packet.encode()?;
-                        // stream.write_all(&encoded).await?;
-                        // stream.flush().await?;
                         todo!("send packet");
                     },
                     Event::RequestTimerReset{ .. } => {},
                     Event::RequestTimerCancel(_) => {},
-                    Event::NotifyPacketReceived(packet) => {
-                        tracing::info!(?packet, "received mqtt packet");
-                    },
                     Event::NotifyError(mqtt_error) => {
                         todo!()
                     },
@@ -157,13 +171,13 @@ where
                 }
             }
 
-            // if consumed == 0 {
-            //     break;
-            // }
-
+            let consumed = cursor.position() as usize;
+            if consumed == 0 {
+                break;
+            }
             inbound.drain(..consumed);
         }
     }
 
-    todo!()
+    Ok(())
 }

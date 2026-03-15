@@ -6,6 +6,7 @@ authors = ["zolkko@gmail.com"]
 
 [dependencies]
 anyhow = { workspace = true }
+bytemuck = "1.25.0"
 clickhouse = "0.14.2"
 dotenvy = "0.15.7"
 krafka = "0.2.0"
