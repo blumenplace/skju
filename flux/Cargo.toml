@@ -1,0 +1,25 @@
+[package]
+name = "skju_flux"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+clickhouse = "0.14.2"
+mqtt-protocol-core = "0.7.7"
+rama = { version = "0.2.0", features = ["tcp", "telemetry"] }
+serde = { workspace = true }
+tokio = { version = "1.50.0", features = [ "full" ] }
+dotenvy = "0.15.7"
+
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+opentelemetry = "0.31.0"
+opentelemetry_sdk = "0.31.0"
+opentelemetry-instrumentation-tokio = "0.1.2"
+krafka = "0.2.0"
+
+
+[dev-dependecies]
+tokio-netem = "0.1.1"

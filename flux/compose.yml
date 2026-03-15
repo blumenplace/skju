@@ -1,6 +1,34 @@
 services:
     flux_events:
+        image: redpandadata/redpanda:latest
+        container_name: flux_events
+        command:
+            - redpanda
+            - start
+            - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+            - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+            - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+#            - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+            - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+            - --rpc-addr redpanda:33145
+            - --advertise-rpc-addr redpanda:33145
+            - --mode dev-container
+            - --smp 1
+            - --default-log-level=info
+        ports:
+            - 18081:18081
+            - 18082:18082
+            - 19092:19092
+            - 19644:9644
+        volumes:
+            - ./redpanda_data:/var/lib/redpanda/data
+#        networks:
+#            - flux_network
+        restart: unless-stopped
+
+    flux_history:
         image: clickhouse:latest
+        container_name: flux_history
         cap_add:
             - SYS_NICE
             - NET_ADMIN
@@ -14,14 +42,21 @@ services:
             # /etc/clickhouse-server/users.d/*.xml - files with user settings adjustments
             - ./db/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
             - ./ch_logs:/var/log/clickhouse-server/
-            - eventsdata:/var/lib/clickhouse/
+            # - historydata:/var/lib/clickhouse/
+            - ./historydata:/var/lib/clickhouse/
         environment:
             - CLICKHOUSE_USER=${CLICKHOUSE_USER:-skju_flux_dev}
             - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
             - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-skju_flux_dev_change_me}
-        #ports:
-        #    - "9000:9000" # tcp clickhouse
+#        ports:
+#            - "9000:9000" # tcp clickhouse
+#        networks:
+#            - flux_network
         restart: unless-stopped
 
-volumes:
-    eventsdata:
+#networks:
+#    flux_network:
+#        driver: bridge
+
+#volumes:
+#    historydata:
