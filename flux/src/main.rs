@@ -1,7 +1,8 @@
 use anyhow::Result;
 use mqtt_protocol_core::mqtt::{
     Connection, Version,
-    connection::role::Server,
+    connection::{TimerKind, Event, role::Server},
+    result_code::MqttError,
 };
 use rama::{
     Context,
@@ -111,14 +112,57 @@ where
         let n = stream.read(&mut read_buf).await?;
         if n == 0 {
             tracing::info!("client disconnected");
+            let left_events = server.notify_closed();
+            todo!("left_events...");
             return Ok(());
         }
 
         inbound.extend_from_slice(&read_buf[..n]);
 
-        // let _ = &mut mqtt;
-        // let _ = &mut inbound;
-        todo!();
+        loop {
+            let mut cursor = mqtt_protocol_core::mqtt::common::Cursor::new(&inbound[..]);
+            let events = server.recv(&mut cursor);
+            if events.is_empty() {
+                break;
+            }
+
+            let mut consumed = 0usize;
+
+            for event in events {
+                match event {
+                    Event::RequestSendPacket {
+                        packet,
+                        release_packet_id_if_send_error,
+                    } => {
+                        // consumed = consumed.max(bytes_consumed);
+                        //
+                        // let encoded = packet.encode()?;
+                        // stream.write_all(&encoded).await?;
+                        // stream.flush().await?;
+                        todo!("send packet");
+                    },
+                    Event::RequestTimerReset{ .. } => {},
+                    Event::RequestTimerCancel(_) => {},
+                    Event::NotifyPacketReceived(packet) => {
+                        tracing::info!(?packet, "received mqtt packet");
+                    },
+                    Event::NotifyError(mqtt_error) => {
+                        todo!()
+                    },
+                    Event::RequestClose => {
+                        tracing::info!("mqtt connection requested close");
+                        return Ok(());
+                    },
+                    Event::NotifyPacketIdReleased(_) => todo!(),
+                }
+            }
+
+            // if consumed == 0 {
+            //     break;
+            // }
+
+            inbound.drain(..consumed);
+        }
     }
 
     todo!()
