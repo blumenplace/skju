@@ -1,30 +1,25 @@
+---
 services:
     flux_events:
-        image: redpandadata/redpanda:latest
-        container_name: flux_events
-        command:
-            - redpanda
-            - start
-            - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
-            - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
-            - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
-#            - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
-            - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
-            - --rpc-addr redpanda:33145
-            - --advertise-rpc-addr redpanda:33145
-            - --mode dev-container
-            - --smp 1
-            - --default-log-level=info
-        ports:
-            - 18081:18081
-            - 18082:18082
-            - 19092:19092
-            - 19644:9644
-        volumes:
-            - ./redpanda_data:/var/lib/redpanda/data
-#        networks:
-#            - flux_network
+        image: ${TANSU_IMAGE}
         restart: unless-stopped
+        environment:
+            RUST_BACKTRACE: ${RUST_BACKTRACE}
+            RUST_LOG: ${RUST_LOG}
+    volumes:
+        - ./etc/schema/:/schema/
+        - ./data:/data/
+    command: |
+        --kafka-cluster-id ${CLUSTER_ID}
+        --kafka-listener-url tcp://0.0.0.0:9092/
+        --kafka-advertised-listener-url ${ADVERTISED_LISTENER_URL}
+        --storage-engine ${STORAGE_ENGINE}
+        --schema-registry file:///schema
+    ports:
+        - 9092:9092
+        - 9100:9100
+#    networks:
+#        - flux_network
 
     flux_history:
         image: clickhouse:latest
