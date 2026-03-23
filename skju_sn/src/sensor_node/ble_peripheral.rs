@@ -1,19 +1,13 @@
 use nrf_softdevice::Softdevice;
 use nrf_softdevice::ble::advertisement_builder::{AdvertisementBuilder, AdvertisementPayload, Flag};
 
-use crate::constants::{MAX_SAMPLE_COUNT, SAMPLE_SIZE};
-
-pub static ADV_DATA: AdvertisementPayload<32> = AdvertisementBuilder::new()
-    .flags(&[Flag::GeneralDiscovery, Flag::LE_Only])
-    .full_name("SKJU_SN_BLE")
-    .build();
+use crate::constants::{BLE_SENSOR_NAME, MAX_SAMPLE_COUNT, SAMPLE_SIZE};
 
 pub static SCAN_DATA: AdvertisementPayload<32> = AdvertisementBuilder::new().build();
-
-#[embassy_executor::task]
-pub async fn softdevice_task(sd: &'static Softdevice) -> ! {
-    sd.run().await
-}
+pub static ADV_DATA: AdvertisementPayload<32> = AdvertisementBuilder::new()
+    .flags(&[Flag::GeneralDiscovery, Flag::LE_Only])
+    .full_name(BLE_SENSOR_NAME)
+    .build();
 
 #[nrf_softdevice::gatt_service(uuid = "8700bc0e-1510-4ece-851e-56940ff8757a")]
 pub struct ReadingsService {
@@ -26,4 +20,11 @@ pub struct ReadingsService {
 #[nrf_softdevice::gatt_server]
 pub struct ReadingsServer {
     pub readings: ReadingsService,
+}
+
+pub fn get_softdevice_config() -> nrf_softdevice::Config {
+    nrf_softdevice::Config {
+        conn_gatt: Some(nrf_softdevice::raw::ble_gatt_conn_cfg_t { att_mtu: 247 }),
+        ..Default::default()
+    }
 }

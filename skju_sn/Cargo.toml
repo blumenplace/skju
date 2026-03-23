@@ -6,6 +6,8 @@ edition = "2024"
 [features]
 default = ["rtt"]
 rtt = ["dep:defmt-rtt"]
+sensor-node = []
+ble-bridge = []
 #semihosting = ["dep:defmt-semihosting"]
 
 [dependencies]
@@ -26,7 +28,7 @@ heapless = "0.9.2"
 static_cell = { version = "2.1.1" }
 embedded-io = { version = "0.7.1", features = ["defmt"] }
 embedded-io-async = { version = "0.7.0", features = ["defmt"] }
-nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice", branch = "master", features = ["s140", "ble-peripheral", "critical-section-impl", "ble-gatt-server", "nrf52840"] }
+nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice", branch = "master", features = ["s140", "evt-max-size-512", "ble-peripheral", "ble-central", "critical-section-impl", "ble-gatt-server", "ble-gatt-client", "nrf52840"] }
 futures = { version = "0.3", default-features = false }
 
 [profile.release]
