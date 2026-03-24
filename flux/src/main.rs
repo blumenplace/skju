@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt};
 use krafka::producer::Producer;
+use rama::graceful::ShutdownGuard;
 
 mod pods;
 mod models;
@@ -77,8 +78,8 @@ async fn main() -> Result<()> {
         .await
         .map_err(|err| anyhow::anyhow!(err))?;
 
-    let svc_shutdown = graceful.guard();
-    let svc = MqttService::new("events-topic".to_string());
+    let svc_shutdown: ShutdownGuard = graceful.guard();
+    let svc = MqttService::new("events-topic".to_string(), svc_shutdown);
     graceful.spawn_task(listener.serve(svc));
     graceful
         .shutdown_with_limit(Duration::from_secs(30))
