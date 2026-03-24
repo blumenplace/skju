@@ -1,5 +1,4 @@
 use std::result::Result as StdResult;
-use bytemuck::PodCastError;
 use rama::Context;
 use rama::graceful::ShutdownGuard;
 use mqtt_protocol_core::mqtt::{
