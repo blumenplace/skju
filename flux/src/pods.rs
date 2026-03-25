@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 use crate::{ReadingValue, SensorId};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub(crate) struct Event {
     sensor_id: SensorId,
     gyro_x: ReadingValue,
