@@ -81,9 +81,10 @@ struct MapView: UIViewRepresentable {
         mapView.addInteraction(interaction)
 
         // Add force/long press drag gesture
-        let forceDragGesture = QuakeGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleForceDrag(_:)))
-        forceDragGesture.delegate = context.coordinator
-        mapView.addGestureRecognizer(forceDragGesture)
+        let quakeGesture = QuakeGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleForceDrag(_:)))
+        quakeGesture.delegate = context.coordinator
+//        quakeGesture.cancelsTouchesInView = false
+        mapView.addGestureRecognizer(quakeGesture)
 
         return mapView
     }

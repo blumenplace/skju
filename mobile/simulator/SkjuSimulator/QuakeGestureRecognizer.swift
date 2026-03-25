@@ -1,4 +1,5 @@
 import UIKit
+import OSLog
 
 final class QuakeGestureRecognizer: UIGestureRecognizer {
 
@@ -33,6 +34,8 @@ final class QuakeGestureRecognizer: UIGestureRecognizer {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
         super.touchesBegan(touches, with: event)
         
+        Logger.ui.debug("touchesBegan")
+        
         guard touches.count == 1, let touch = touches.first, let view = view else {
             state = .failed
             return
@@ -42,17 +45,32 @@ final class QuakeGestureRecognizer: UIGestureRecognizer {
         
         switch internalState {
         case .waiting:
+            Logger.ui.debug("touchesBegan: waiting -> firstTap")
             internalState = .firstTap(Date())
             doubleTapTimer = Timer.scheduledTimer(withTimeInterval: doubleTapInterval, repeats: false) { [weak self] _ in
                 self?.reset()
                 self?.state = .failed
             }
+
+            if state == .possible {
+                state = .began
+            } else if state == .began || state == .changed {
+                state = .changed
+            }
             
         case .firstTap(let firstTapTime), .secondTap(let firstTapTime, _, _):
+            Logger.ui.debug("touchesBegan: -> secondTap")
             if Date().timeIntervalSince(firstTapTime) <= doubleTapInterval {
                 doubleTapTimer?.invalidate()
                 doubleTapTimer = nil
                 internalState = .secondTap(startTime: Date(), initialLocation: location, currentLocation: nil)
+                
+                if state == .possible {
+                    state = .began
+                } else if state == .began || state == .changed {
+                    state = .changed
+                }
+                
             } else {
                 reset()
                 state = .failed
@@ -62,6 +80,8 @@ final class QuakeGestureRecognizer: UIGestureRecognizer {
     
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
         super.touchesMoved(touches, with: event)
+        
+        Logger.ui.debug("touchesMoved")
         
         guard let touch = touches.first, let view = view else {
             state = .failed
@@ -84,6 +104,8 @@ final class QuakeGestureRecognizer: UIGestureRecognizer {
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
         super.touchesEnded(touches, with: event)
         
+        Logger.ui.debug("touchesEnded")
+        
         guard let touch = touches.first, let view = view else {
             state = .failed
             return
@@ -93,14 +115,18 @@ final class QuakeGestureRecognizer: UIGestureRecognizer {
         
         switch internalState {
         case .waiting:
+            Logger.ui.debug("touchesEnded: waiting reset")
             reset()
             state = .failed
 
         case .firstTap:
+            Logger.ui.debug("touchesEnded: firstTap do nothing")
             // do nothing, waiting for the second tap
             break
             
         case .secondTap(_, let initialLoc, let currentLoc):
+            Logger.ui.debug("touchesEnded: secondTap")
+
             doubleTapTimer?.invalidate()
             doubleTapTimer = nil
             
@@ -113,6 +139,8 @@ final class QuakeGestureRecognizer: UIGestureRecognizer {
     
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
         super.touchesCancelled(touches, with: event)
+        
+        Logger.ui.debug("touchesCancelled")
         
         internalState = .waiting
         doubleTapTimer?.invalidate()
