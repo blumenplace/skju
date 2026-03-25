@@ -57,6 +57,7 @@ final class QuakeRenderer: MKOverlayRenderer {
     }
 }
 
+
 struct MapView: UIViewRepresentable {
     var sensors: [SensorItem] = []
     var selectedCoordinate: Coordinate? = nil
@@ -66,9 +67,7 @@ struct MapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
 
-        // Configure OpenStreetMap Tile Overlay
-        let template = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        let overlay = MKTileOverlay(urlTemplate: template)
+        let overlay = MKTileOverlay(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
         overlay.canReplaceMapContent = true
         mapView.addOverlay(overlay, level: .aboveLabels)
 
@@ -80,6 +79,11 @@ struct MapView: UIViewRepresentable {
         // Add context menu interaction to show a popup near the press location
         let interaction = UIContextMenuInteraction(delegate: context.coordinator)
         mapView.addInteraction(interaction)
+
+        // Add force/long press drag gesture
+        let forceDragGesture = QuakeGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleForceDrag(_:)))
+        forceDragGesture.delegate = context.coordinator
+        mapView.addGestureRecognizer(forceDragGesture)
 
         return mapView
     }
@@ -108,12 +112,37 @@ struct MapView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
+    
+    func onQuake(x: Double, y: Double, intensity: CGFloat) {
+        print("QUAKE AT \(x), \(y) with intensity \(intensity)")
+    }
 
-    class Coordinator: NSObject, MKMapViewDelegate, UIContextMenuInteractionDelegate {
+    class Coordinator: NSObject, MKMapViewDelegate, UIContextMenuInteractionDelegate, UIGestureRecognizerDelegate {
         var parent: MapView
 
         init(_ parent: MapView) {
             self.parent = parent
+        }
+
+        @objc func handleForceDrag(_ gesture: QuakeGestureRecognizer) {
+            guard let mapView = gesture.view as? MKMapView else { return }
+            
+            // Only trigger on .ended - when the user lifts their finger
+            if gesture.state == .ended {
+                let location = gesture.location(in: mapView)
+                let coord = mapView.convert(location, toCoordinateFrom: mapView)
+                let x = coord.longitude
+                let y = coord.latitude
+                
+                let dragDistance = gesture.dragDistance
+                
+                parent.onQuake(x: x, y: y, intensity: dragDistance)
+            }
+        }
+        
+        // Allow simultaneous gestures so map interactions still work
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            return false  // Set to true if you want map gestures to work simultaneously
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
