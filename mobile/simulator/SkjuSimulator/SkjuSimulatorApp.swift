@@ -25,5 +25,14 @@ struct SkjuSimulatorApp: App {
                 )
             ]*/
         )
+        .commands {
+            // Add custom menu commands
+            CommandGroup(after: .newItem) {
+                Button("New Sensor") {
+                    // Action
+                }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+            }
+        }
     }
 }
