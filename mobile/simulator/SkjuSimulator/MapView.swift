@@ -59,6 +59,9 @@ final class QuakeRenderer: MKOverlayRenderer {
 
 
 struct MapView: UIViewRepresentable {
+        
+    @Environment(QuakeGestureState.self) var gestureState
+
     var sensors: [SensorItem] = []
     var selectedCoordinate: Coordinate? = nil
     var onAddAt: ((Double, Double) -> Void)? = nil
@@ -77,7 +80,7 @@ struct MapView: UIViewRepresentable {
         
         // Add force/long press drag gesture
         let quakeGesture = QuakeGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleForceDrag(_:)))
-        quakeGesture.quakeDelegate = context.coordinator
+//        quakeGesture.quakeDelegate = context.coordinator
         mapView.addGestureRecognizer(quakeGesture)
 
         // Add context menu interaction to show a popup near the press location

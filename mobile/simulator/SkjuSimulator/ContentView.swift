@@ -15,6 +15,8 @@ struct ContentView: View {
 
     @State private var pendingInitialX: Double? = nil
     @State private var pendingInitialY: Double? = nil
+    
+    @State private var quakeGesture = QuakeGestureState()
 
     var body: some View {
         NavigationSplitView {
@@ -85,19 +87,24 @@ struct ContentView: View {
                 }
             }
         } detail: {
-            MapView(
-                sensors: items,
-                selectedCoordinate: selection?.coordinate,
-                onAddAt: { x, y in
-                    pendingInitialX = x
-                    pendingInitialY = y
-                    isPresentingAdd = true
-                },
-                onQuakeAt: { x, y in
-                    // TODO: launch the eather quake simulation
-                }
-            )
-            .ignoresSafeArea()
+            ZStack {
+                MapView(
+                    sensors: items,
+                    selectedCoordinate: selection?.coordinate,
+                    onAddAt: { x, y in
+                        pendingInitialX = x
+                        pendingInitialY = y
+                        isPresentingAdd = true
+                    },
+                    onQuakeAt: { x, y in
+                        // TODO: launch the eather quake simulation
+                    }
+                )
+                .ignoresSafeArea()
+                
+                QuakeHUDView()
+                    .ignoresSafeArea()
+            }.environment(quakeGesture)
         }
     }
 }
