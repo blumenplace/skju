@@ -3,21 +3,20 @@ import SwiftUI
 
 struct EditStationView: View {
     @Environment(\.dismiss) private var dismiss
+    
+    static private let validLongitude: ClosedRange<Double> = -180.0 ... 180.0
+    static private let validLatitude: ClosedRange<Double> = -90.0 ... 90.0
 
     static private let defaultPointFormat = "%.5f"
 
     @State private var name: String = ""
-    @State private var longitude: String = ""
-    @State private var latitude: String = ""
+    @State private var longitude: Double = 0.0
+    @State private var latitude: Double = 0.0
 
     private let viewTitle: String
     private let confirmTitle: String
 
-    private var canSave: Bool {
-        !name.isEmpty &&
-            parseCoordinate(longitude) != nil &&
-            parseCoordinate(latitude) != nil
-    }
+    private var canSave: Bool { !name.isEmpty }
 
     var onSave: (Double, Double) -> Void
 
@@ -30,15 +29,11 @@ struct EditStationView: View {
     ) {
         self.viewTitle = title
         self.confirmTitle = confirmLabel
-        
-        self._longitude = State(initialValue: initialX.map { String(format: Self.defaultPointFormat, $0) } ?? "")
-        self._latitude = State(initialValue: initialY.map { String(format: Self.defaultPointFormat, $0) } ?? "")
-        
-        self.onSave = onSave
-    }
 
-    private func parseCoordinate(_ value: String) -> Double? {
-        Double(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        self._longitude = State(initialValue: initialX ?? 0.0)
+        self._latitude = State(initialValue: initialY ?? 0.0)
+
+        self.onSave = onSave
     }
 
     var body: some View {
@@ -50,15 +45,23 @@ struct EditStationView: View {
                     .accessibilityLabel("Enter a station's name")
 
                 Section(header: Text("Coordinates")) {
-                    TextField("Longitude", text: $longitude)
-                        .keyboardType(.numbersAndPunctuation)
-                        .textContentType(.location)
+                    TextField("Longitude", value: $longitude, format: .number)
+                        .keyboardType(.decimalPad)
+                        .textContentType(.oneTimeCode)
                         .accessibilityLabel("Longitude coordinate")
+                        .disableAutocorrection(true)
+                        .onChange(of: longitude) { _, v in
+                            longitude = v.clamped(to: Self.validLongitude)
+                        }
 
-                    TextField("Latitude", text: $latitude)
-                        .keyboardType(.numbersAndPunctuation)
-                        .textContentType(.location)
+                    TextField("Latitude", value: $latitude, format: .number)
+                        .keyboardType(.decimalPad)
+                        .textContentType(.oneTimeCode)
                         .accessibilityLabel("Latitude coordinate")
+                        .disableAutocorrection(true)
+                        .onChange(of: latitude) { _, v in
+                            latitude = v.clamped(to: Self.validLatitude)
+                        }
                 }
             }
             .navigationTitle(viewTitle)
@@ -68,16 +71,22 @@ struct EditStationView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(confirmTitle) {
-                        if let lon = parseCoordinate(longitude),
+                        /*if let lon = parseCoordinate(longitude),
                            let lat = parseCoordinate(latitude)
                         {
                             onSave(lon, lat)
                             dismiss()
-                        }
+                        }*/
                     }
                     .disabled(!canSave)
                 }
             }
         }
+    }
+}
+
+private extension Double {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }
