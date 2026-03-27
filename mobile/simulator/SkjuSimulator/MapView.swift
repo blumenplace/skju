@@ -73,18 +73,16 @@ struct MapView: UIViewRepresentable {
 
         let quakeOverlay = QuakeOverlay(region: mapView.region)
         mapView.addOverlay(quakeOverlay, level: .aboveLabels)
-
         mapView.delegate = context.coordinator
-
-        // Add context menu interaction to show a popup near the press location
-        let interaction = UIContextMenuInteraction(delegate: context.coordinator)
-        mapView.addInteraction(interaction)
-
+        
         // Add force/long press drag gesture
         let quakeGesture = QuakeGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleForceDrag(_:)))
-        quakeGesture.delegate = context.coordinator
-//        quakeGesture.cancelsTouchesInView = false
+        quakeGesture.quakeDelegate = context.coordinator
         mapView.addGestureRecognizer(quakeGesture)
+
+        // Add context menu interaction to show a popup near the press location
+//        let interaction = UIContextMenuInteraction(delegate: context.coordinator)
+//        mapView.addInteraction(interaction)
 
         return mapView
     }
@@ -118,7 +116,9 @@ struct MapView: UIViewRepresentable {
         print("QUAKE AT \(x), \(y) with intensity \(intensity)")
     }
 
-    class Coordinator: NSObject, MKMapViewDelegate, UIContextMenuInteractionDelegate, UIGestureRecognizerDelegate {
+    class Coordinator: NSObject, MKMapViewDelegate, UIContextMenuInteractionDelegate,
+                        QuakeGestureRecognizerDelegate
+    {
         var parent: MapView
 
         init(_ parent: MapView) {
@@ -134,10 +134,8 @@ struct MapView: UIViewRepresentable {
                 let coord = mapView.convert(location, toCoordinateFrom: mapView)
                 let x = coord.longitude
                 let y = coord.latitude
-                
-                let dragDistance = gesture.dragDistance
-                
-                parent.onQuake(x: x, y: y, intensity: dragDistance)
+
+                parent.onQuake(x: x, y: y, intensity: 0)
             }
         }
         
@@ -188,6 +186,22 @@ struct MapView: UIViewRepresentable {
                 }
                 return UIMenu(title: "Map", children: [add, quake])
             }
+        }
+
+        func quakeGestureDidBegin(location: CGPoint) {
+            print("Quake gesture began at \(location)")
+        }
+
+        func quakeMagnitudeDidChange(location: CGPoint, magnitude: Double) {
+            print("Quake magnitude at \(location): \(magnitude)")
+        }
+
+        func quakeGestureDidEnd(location: CGPoint, magnitude: Double) {
+            print("Quake gesture ended at \(location) with magnitude \(magnitude)")
+        }
+
+        func quakeGestureDidCancel() {
+            print("Quake gesture was cancelled")
         }
     }
 }
