@@ -66,7 +66,9 @@ struct ContentView: View {
                     pendingInitialY = nil
                 }
             ) {
-                AddSensorView(
+                EditStationView(
+                    title: "Add New Seismic Station",
+                    confirmLabel: "Add",
                     initialX: pendingInitialX,
                     initialY: pendingInitialY
                 ) { x, y in
@@ -76,11 +78,11 @@ struct ContentView: View {
                 }
             }
             .sheet(item: $itemBeingEdited) { item in
-                AddSensorView(
+                EditStationView(
+                    title: "Edit Seismic Station",
+                    confirmLabel: "Update",
                     initialX: item.coordinate.x,
                     initialY: item.coordinate.y,
-                    title: "Edit Sensor",
-                    confirmLabel: "Update"
                 ) { x, y in
                     item.x = x
                     item.y = y
