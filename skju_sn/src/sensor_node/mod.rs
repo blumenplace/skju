@@ -2,15 +2,17 @@ pub mod ble_peripheral;
 mod spi;
 mod timer;
 
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::cell::Cell;
+use core::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 use ble_peripheral::{ADV_DATA, ReadingsServer, ReadingsServerEvent, ReadingsServiceEvent, SCAN_DATA};
 use embassy_nrf::gpio::{Input, Output};
 use embassy_nrf::spim::Spim;
+use embassy_sync::blocking_mutex::Mutex as BlockingMutex;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
 use embassy_sync::channel::Channel;
 use embassy_sync::mutex::Mutex;
-use embassy_time::Timer;
+use embassy_time::{Instant, Timer};
 use futures::future::{Either, select};
 use futures::pin_mut;
 use mpu6500::MPU6500;
@@ -26,8 +28,9 @@ use nrf_softdevice::ble::{Connection, gatt_server, peripheral};
 use spi::SpiDeviceBus;
 use timer::TimerHandler;
 
-use crate::constants::{MAX_SAMPLE_COUNT, SAMPLE_RATE_HZ, SAMPLE_SIZE};
+use crate::constants::{BLE_BATCH_SIZE, MAX_SAMPLE_COUNT, SAMPLE_RATE_HZ, SAMPLE_SIZE, TIMESTAMP_BYTES};
 
+static CENTRAL_TIMESTAMP_OFFSET: BlockingMutex<CriticalSectionRawMutex, Cell<i64>> = BlockingMutex::new(Cell::new(0));
 static NOTIFY_ENABLED: AtomicBool = AtomicBool::new(false);
 static READINGS_CHANNEL: Channel<CriticalSectionRawMutex, Readings, 1> = Channel::new();
 
@@ -53,18 +56,31 @@ pub async fn handle_mpu_interrupts(spim: Spim<'static>, mpu_cs: Output<'static>,
             continue;
         }
 
-        let current_sample_count = mpu6500.fifo_bytes_count().await;
-        let batch_size = MAX_SAMPLE_COUNT * fifo_layout.sample_size;
+        let current_sample_bytes = mpu6500.fifo_bytes_count().await;
+        let current_sample_count = current_sample_bytes as usize / SAMPLE_SIZE;
         let mut readings = [0x00; MAX_SAMPLE_COUNT * SAMPLE_SIZE];
+        let current_timestamp = Instant::now().as_millis();
 
-        if (current_sample_count as usize) < batch_size {
+        if (current_sample_bytes as usize) < MAX_SAMPLE_COUNT * SAMPLE_SIZE {
             continue;
         }
 
         mpu6500.drain_fifo(&mut readings).await;
         print_readings(&readings);
 
-        let _ = READINGS_CHANNEL.sender().try_send(Readings { batch_size, readings });
+        let batch_span_millis = (1000 / SAMPLE_RATE_HZ) * (current_sample_count - 1) as u64;
+        let central_offset = CENTRAL_TIMESTAMP_OFFSET.lock(|v| v.get());
+        let batch_start_timestamp = (current_timestamp - batch_span_millis) as i64 + central_offset;
+
+        // not synced yet or something went wrong, drop the batch
+        if batch_start_timestamp < 0 {
+            continue;
+        }
+
+        let _ = READINGS_CHANNEL.sender().try_send(Readings {
+            batch_timestamp: batch_start_timestamp as u64,
+            readings,
+        });
     }
 }
 
@@ -88,6 +104,12 @@ pub async fn advertise_ble(sd: &'static Softdevice, server: ReadingsServer) {
                 ReadingsServiceEvent::ReadingsCccdWrite { notifications } => {
                     NOTIFY_ENABLED.store(notifications, Ordering::Release);
                 }
+                ReadingsServiceEvent::CentralTimestampWrite(curr_central_timestamp) => {
+                    let curr_local_timestamp = Instant::now().as_millis();
+                    let timestamp_diff = curr_central_timestamp as i64 - curr_local_timestamp as i64;
+
+                    CENTRAL_TIMESTAMP_OFFSET.lock(|v| v.set(timestamp_diff));
+                }
             },
         });
 
@@ -107,25 +129,30 @@ async fn process_readings(connection: &Connection, server: &ReadingsServer) {
     loop {
         let batch = READINGS_CHANNEL.receiver().receive().await;
 
-        defmt::info!("Readings: {=[u8]:x}", &batch.readings[..batch.batch_size]);
-
         if !NOTIFY_ENABLED.load(Ordering::Acquire) {
             Timer::after_millis(1000).await;
             continue;
         }
 
-        match server.readings.readings_notify(connection, &batch.readings) {
-            Ok(_) => {}
-            Err(_) => {
-                let _ = server.readings.readings_set(&batch.readings);
-            }
-        }
+        let _res = server.readings.readings_notify(connection, &batch.bytes());
     }
 }
 
 struct Readings {
-    batch_size: usize,
+    batch_timestamp: u64,
     readings: [u8; MAX_SAMPLE_COUNT * SAMPLE_SIZE],
+}
+
+impl Readings {
+    fn bytes(&self) -> [u8; BLE_BATCH_SIZE] {
+        let timestamp_bytes: [u8; TIMESTAMP_BYTES] = self.batch_timestamp.to_be_bytes();
+        let mut batch_bytes = [0x00; BLE_BATCH_SIZE];
+
+        batch_bytes[..TIMESTAMP_BYTES].copy_from_slice(&timestamp_bytes);
+        batch_bytes[TIMESTAMP_BYTES..].copy_from_slice(&self.readings[..BLE_BATCH_SIZE]);
+
+        batch_bytes
+    }
 }
 
 fn print_readings(readings: &[u8]) {

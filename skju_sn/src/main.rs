@@ -33,10 +33,15 @@ use crate::sensor_node::ble_peripheral::{ReadingsServer, get_softdevice_config};
 use crate::sensor_node::{advertise_ble, handle_mpu_interrupts};
 
 #[cfg(feature = "sensor-node")]
-
 bind_interrupts!(struct Irqs {
     SPI2 => spim::InterruptHandler<peripherals::SPI2>;
 });
+
+#[cfg(all(feature = "ble-bridge", feature = "sensor-node"))]
+compile_error!("ble-bridge and sensor-node features cannot be enabled at the same time");
+
+#[cfg(not(any(feature = "ble-bridge", feature = "sensor-node")))]
+compile_error!("sensor-node or ble-bridge features should be enabled");
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
@@ -104,6 +109,6 @@ async fn main(spawner: Spawner) {
 }
 
 #[embassy_executor::task]
-pub async fn softdevice_task(sd: &'static Softdevice) -> ! {
+async fn softdevice_task(sd: &'static Softdevice) {
     sd.run().await
 }
