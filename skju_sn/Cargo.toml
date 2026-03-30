@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["rtt", "ble-bridge"]
+default = ["rtt"]
 rtt = ["dep:defmt-rtt"]
-sensor-node = []
 ble-bridge = []
+mpu-sensor = []
+ble-node = ["mpu-sensor"]
 #semihosting = ["dep:defmt-semihosting"]
 
 [dependencies]
