@@ -23,7 +23,7 @@ struct QuakeHUDView: View {
         // The HUD must not swallow touches — the map beneath still needs them.
         .allowsHitTesting(false)
         // Fade in/out with the phase change.
-        .animation(.easeInOut(duration: 0.15), value: gesture.phase)
+        .animation(.easeInOut(duration: 0.5), value: gesture.phase)
     }
 }
 
@@ -36,27 +36,29 @@ private struct CrosshairView: View {
 
     var body: some View {
         Canvas { context, _ in
-            let lineColor = Color.white.opacity(0.2)
-            let tickColor = Color.white.opacity(0.5)
+            let lineColor = Color.white.opacity(0.5)
+            let tickColor = Color.white.opacity(0.7)
+            
+            let lineWidth = 3.0
 
             // Horizontal arm
             var hPath = Path()
             hPath.move(to: CGPoint(x: origin.x - armLength, y: origin.y))
             hPath.addLine(to: CGPoint(x: origin.x + armLength, y: origin.y))
-            context.stroke(hPath, with: .color(lineColor), lineWidth: 1)
+            context.stroke(hPath, with: .color(lineColor), lineWidth: lineWidth)
 
             // Vertical arm
             var vPath = Path()
             vPath.move(to: CGPoint(x: origin.x, y: origin.y - armLength))
             vPath.addLine(to: CGPoint(x: origin.x, y: origin.y + armLength))
-            context.stroke(vPath, with: .color(lineColor), lineWidth: 1)
+            context.stroke(vPath, with: .color(lineColor), lineWidth: lineWidth)
 
             // End ticks — horizontal
             for dx: CGFloat in [-armLength, armLength] {
                 var t = Path()
                 t.move(to:    CGPoint(x: origin.x + dx, y: origin.y - tickLength / 2))
                 t.addLine(to: CGPoint(x: origin.x + dx, y: origin.y + tickLength / 2))
-                context.stroke(t, with: .color(tickColor), lineWidth: 1)
+                context.stroke(t, with: .color(tickColor), lineWidth: lineWidth)
             }
 
             // End ticks — vertical
@@ -64,7 +66,7 @@ private struct CrosshairView: View {
                 var t = Path()
                 t.move(to:    CGPoint(x: origin.x - tickLength / 2, y: origin.y + dy))
                 t.addLine(to: CGPoint(x: origin.x + tickLength / 2, y: origin.y + dy))
-                context.stroke(t, with: .color(tickColor), lineWidth: 1)
+                context.stroke(t, with: .color(tickColor), lineWidth: lineWidth)
             }
 
             // Centre dot
@@ -167,7 +169,6 @@ private struct ParameterCardView: View {
     let parameters: QuakeParameters
     let fingerPoint: CGPoint
 
-    /// Card dimensions for clamping — approximate, updated after first layout.
     private let cardWidth:  CGFloat = 148
     private let cardHeight: CGFloat = 96
 
@@ -181,27 +182,23 @@ private struct ParameterCardView: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("PARAMETERS")
+            Text("Quake Parameters")
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.35))
                 .kerning(1.2)
 
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("MAG")
-                    .cardLabel()
+                Text("MAG").cardLabel()
                 Text(parameters.magnitude, format: .number.precision(.fractionLength(1)))
                     .cardValue(color: Color(red: 1.0, green: 0.72, blue: 0.25))
-                Text("M")
-                    .cardUnit()
+                Text("M").cardUnit()
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("DEP")
-                    .cardLabel()
+                Text("DEP").cardLabel()
                 Text(Int(parameters.depthKm).formatted())
                     .cardValue(color: Color(red: 0.38, green: 0.75, blue: 1.0))
-                Text("km")
-                    .cardUnit()
+                Text("km").cardUnit()
             }
 
             Divider()

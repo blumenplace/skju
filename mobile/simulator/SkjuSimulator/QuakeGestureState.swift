@@ -1,26 +1,12 @@
 import SwiftUI
 import CoreLocation
 
-/// Phases that mirror UIGestureRecognizer.State but are
-/// meaningful only to our quake gesture.
-enum QuakeGesturePhase: Equatable {
-    case idle
-    case arming           // long-press threshold not yet reached
-    case active           // threshold reached; user is dragging
-    case fired            // user lifted finger; simulation triggered
-}
-
 /// Observable bridge between the UIKit gesture recognizer
 /// and SwiftUI views. All properties are updated on the main actor.
 @Observable
 @MainActor
 final class QuakeGestureState {
-
-    // MARK: - Phase
-
     var phase: QuakeGesturePhase = .idle
-
-    // MARK: - Touch geometry (in the SwiftUI coordinate space)
 
     /// Where the long press began — the crosshair origin.
     var originPoint: CGPoint = .zero
@@ -36,17 +22,11 @@ final class QuakeGestureState {
         )
     }
 
-    // MARK: - Live parameters
-
     /// Parameters computed from the current drag delta.
     var parameters: QuakeParameters = QuakeParameters()
 
-    // MARK: - Last fired event
-
     /// Set when the user lifts their finger; consumed by the simulation engine.
     var lastFiredParameters: QuakeParameters? = nil
-
-    // MARK: - Gesture callbacks (called by QuakeGestureRecognizer)
 
     func gestureArming(at point: CGPoint) {
         phase        = .arming
@@ -89,4 +69,11 @@ final class QuakeGestureState {
     func gestureCancelled() {
         phase = .idle
     }
+}
+
+enum QuakeGesturePhase: Equatable {
+    case idle
+    case arming
+    case active
+    case fired
 }

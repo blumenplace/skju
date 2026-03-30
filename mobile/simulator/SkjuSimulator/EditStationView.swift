@@ -77,6 +77,7 @@ struct EditStationView: View {
                             onSave(lon, lat)
                             dismiss()
                         }*/
+                        dismiss()
                     }
                     .disabled(!canSave)
                 }

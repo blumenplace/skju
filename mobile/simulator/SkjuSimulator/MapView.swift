@@ -60,7 +60,7 @@ final class QuakeRenderer: MKOverlayRenderer {
 
 struct MapView: UIViewRepresentable {
         
-    @Environment(QuakeGestureState.self) var gestureState
+    @Environment(QuakeGestureState.self) var quakeGestureState
 
     var sensors: [SensorItem] = []
     var selectedCoordinate: Coordinate? = nil
@@ -77,15 +77,17 @@ struct MapView: UIViewRepresentable {
         let quakeOverlay = QuakeOverlay(region: mapView.region)
         mapView.addOverlay(quakeOverlay, level: .aboveLabels)
         mapView.delegate = context.coordinator
-        
+
         // Add force/long press drag gesture
-        let quakeGesture = QuakeGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleForceDrag(_:)))
-//        quakeGesture.quakeDelegate = context.coordinator
+        let quakeGesture = QuakeGestureRecognizer(target: context.coordinator)
+//        quakeGesture.onUpdate = { [weak coordinator] phase, origin, current in
+//            coordinator?.handleQuakeGestureUpdate(phase: phase, origin: origin, current: current)
+//        }
         mapView.addGestureRecognizer(quakeGesture)
 
         // Add context menu interaction to show a popup near the press location
-//        let interaction = UIContextMenuInteraction(delegate: context.coordinator)
-//        mapView.addInteraction(interaction)
+        // let interaction = UIContextMenuInteraction(delegate: context.coordinator)
+        // mapView.addInteraction(interaction)
 
         return mapView
     }
@@ -120,12 +122,43 @@ struct MapView: UIViewRepresentable {
     }
 
     class Coordinator: NSObject, MKMapViewDelegate, UIContextMenuInteractionDelegate,
-                        QuakeGestureRecognizerDelegate
+                       QuakeGestureRecognizerDelegate
     {
         var parent: MapView
 
         init(_ parent: MapView) {
             self.parent = parent
+        }
+        
+        func onQuakeGestureUpdate(phase: UIGestureRecognizer.State, origin: CGPoint, current: CGPoint) {
+            // Map may have moved/ zoomed, need to recalculate the coordinate
+//            let coordinate = self.parent.convert(origin, toCoordinateFrom: self.parent)
+            // let coordinate = CLLocationCoordinate2D(latitude: origin.x, longitude: origin.y)
+            
+            Task { @MainActor in
+                switch phase {
+                case .began:
+                    print("BEGAN")
+                    self.parent.quakeGestureState.gestureActivated(at: origin)
+
+                case .changed:
+                    print("CHANGED")
+                    self.parent.quakeGestureState.gestureMoved(to: current, coordinate: origin.asClLocationCoordinate2D)
+
+                case .ended:
+                    print("ENDED")
+                    self.parent.quakeGestureState.gestureFired(coordinate: origin.asClLocationCoordinate2D)
+
+                case .failed, .cancelled:
+                    print("CANCLLED")
+                    self.parent.quakeGestureState.gestureCancelled()
+
+                default:
+                    print("BREAK")
+                    break
+                }
+            }
+            
         }
 
         @objc func handleForceDrag(_ gesture: QuakeGestureRecognizer) {
@@ -180,31 +213,16 @@ struct MapView: UIViewRepresentable {
             let y = coord.latitude
 
             return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
-                let add = UIAction(title: "Add Sensor", image: UIImage(systemName: "plus")) {
+                let add = UIAction(title: "Add New Seismic Station", image: UIImage(systemName: "plus")) {
                   [weak self] _ in
                   self?.parent.onAddAt?(x, y)
                 }
-                let quake = UIAction(title: "Quake", image: UIImage(systemName: "waveform.path.ecg")) { [weak self] _ in
-                    self?.parent.onQuakeAt?(x, y)
-                }
+                let quake = UIAction(
+                    title: "Trigger Earth Quake",
+                    image: UIImage(systemName: "waveform.path.ecg"))
+                { [weak self] _ in self?.parent.onQuakeAt?(x, y) }
                 return UIMenu(title: "Map", children: [add, quake])
             }
-        }
-
-        func quakeGestureDidBegin(location: CGPoint) {
-            print("Quake gesture began at \(location)")
-        }
-
-        func quakeMagnitudeDidChange(location: CGPoint, magnitude: Double) {
-            print("Quake magnitude at \(location): \(magnitude)")
-        }
-
-        func quakeGestureDidEnd(location: CGPoint, magnitude: Double) {
-            print("Quake gesture ended at \(location) with magnitude \(magnitude)")
-        }
-
-        func quakeGestureDidCancel() {
-            print("Quake gesture was cancelled")
         }
     }
 }

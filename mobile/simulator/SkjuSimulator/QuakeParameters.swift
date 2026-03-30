@@ -4,17 +4,17 @@ import CoreLocation
 struct QuakeParameters {
 
     static let defaultMagnitude: Double = 3.5
-    static let defaultDepthKm:   Double = 100.0
+    static let defaultDepthKm:   Double = 70.0
 
     /// Points of horizontal drag per 1.0 magnitude unit.
     static let ptsPerMagnitudeUnit: CGFloat = 20.0
 
     /// Points of vertical drag per 1 km of depth.
     /// Dragging down increases depth; dragging up decreases it.
-    static let ptsPerDepthKm: CGFloat = 0.22
+    static let ptsPerDepthKm: CGFloat = 0.30
 
     static let magnitudeRange: ClosedRange<Double> = 0.0 ... 9.5
-    static let depthKmRange:   ClosedRange<Double> = 0.0 ... 700.0
+    static let depthKmRange:   ClosedRange<Double> = 0.0 ... 800.0
 
     /// Richter / moment magnitude (0.0 – 9.5).
     let magnitude: Double
