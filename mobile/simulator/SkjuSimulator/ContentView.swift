@@ -4,6 +4,21 @@ import SwiftUI
 import UIKit
 
 
+struct NewSeismicStation: Identifiable {
+    typealias ID = String
+
+    var id: Self.ID { name }
+
+    public let name: String
+    public let coordinate: CLLocationCoordinate2D
+    
+    init(name: String, coordinate: CLLocationCoordinate2D) {
+        self.name = name
+        self.coordinate = coordinate
+    }
+}
+
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\SensorItem.x), SortDescriptor(\SensorItem.y)]) private var items: [SensorItem]
@@ -11,6 +26,8 @@ struct ContentView: View {
     @State private var selection: SensorItem? = nil
 
     @State private var isPresentingAdd = false
+    @State private var newStationItem: NewSeismicStation? = nil
+
     @State private var itemBeingEdited: SensorItem? = nil
 
     @State private var pendingInitialX: Double? = nil
@@ -37,15 +54,21 @@ struct ContentView: View {
                         .tint(.blue)
                     }
             }
-            .navigationTitle("Sensors")
+            .navigationTitle("Seismic Stations")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        isPresentingAdd = true
+                        Task {
+                            // TODO: default coordinates will be a center of the map...
+                            let coordinate = CLLocationCoordinate2D(latitude: 0.0, longitude: 0.0)
+                            let newRandomName = await generateStationName(at: coordinate)
+                            
+                            newStationItem = NewSeismicStation(name: newRandomName, coordinate: coordinate)
+                        }
                     } label: {
                         Label("Add", systemImage: "plus")
                     }
-                    .accessibilityLabel("Add a sensor")
+                    .accessibilityLabel("Add a Seismic Station")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -56,21 +79,21 @@ struct ContentView: View {
                         Label("Edit", systemImage: "pencil")
                     }
                     .disabled(selection == nil)
-                    .accessibilityLabel("Edit selected sensor")
+                    .accessibilityLabel("Edit selected Seismic Station")
                 }
             }
             .sheet(
-                isPresented: $isPresentingAdd,
+                item: $newStationItem,
                 onDismiss: {
-                    pendingInitialX = nil
-                    pendingInitialY = nil
+                    newStationItem = nil
                 }
-            ) {
+            ) { item in
                 EditStationView(
                     title: "Add New Seismic Station",
                     confirmLabel: "Add",
-                    initialX: pendingInitialX,
-                    initialY: pendingInitialY
+                    initialX: item.coordinate.longitude,
+                    initialY: item.coordinate.latitude,
+                    name: item.name
                 ) { x, y in
                     let new = SensorItem(x: x, y: y)
                     modelContext.insert(new)

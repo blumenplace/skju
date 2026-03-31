@@ -25,10 +25,12 @@ struct EditStationView: View {
         confirmLabel: String,
         initialX: Double? = nil,
         initialY: Double? = nil,
+        name: String = "",
         onSave: @escaping (Double, Double) -> Void
     ) {
         self.viewTitle = title
         self.confirmTitle = confirmLabel
+        self.name = name
 
         self._longitude = State(initialValue: initialX ?? 0.0)
         self._latitude = State(initialValue: initialY ?? 0.0)
