@@ -17,7 +17,7 @@ struct SkjuSimulatorApp: App {
             ContentView()
         }
         .modelContainer(
-            for: SensorItem.self,
+            for: StationItem.self,
             /*configurations: [
                 SensorStoreConfiguration(
                     identifier: "SensorRemoteStore",
@@ -25,6 +25,7 @@ struct SkjuSimulatorApp: App {
                 )
             ]*/
         )
+        /*
         .commands {
             // Add custom menu commands
             CommandGroup(after: .newItem) {
@@ -33,6 +34,6 @@ struct SkjuSimulatorApp: App {
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
             }
-        }
+        }*/
     }
 }

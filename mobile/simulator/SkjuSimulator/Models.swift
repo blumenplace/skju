@@ -1,25 +1,30 @@
 import Foundation
 import SwiftData
+import CoreLocation
 
-public struct Coordinate: Hashable {
-    let x: Double
-    let y: Double
-}
-
-@Model final public class SensorItem: Identifiable, Hashable {
+@Model final public class StationItem: Identifiable, Hashable {
     public var id: UUID
-    var x: Double
-    var y: Double
 
-    init(id: UUID = UUID(), x: Double, y: Double) {
-        self.id = id
-        self.x = x
-        self.y = y
+    private(set) var name: String
+    private(set) var latitude: CLLocationDegrees
+    private(set) var longitude: CLLocationDegrees
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 
-    var coordinate: Coordinate { Coordinate(x: x, y: y) }
-    var title: String { "x: \(x), y: \(y)" }
+    init(id: UUID, name: String, lat: CLLocationDegrees, lon: CLLocationDegrees) {
+        self.id = id
+        self.name = name
+        self.latitude = lat
+        self.longitude = lon
+    }
 
-    public static func == (lhs: SensorItem, rhs: SensorItem) -> Bool { lhs.id == rhs.id }
+    convenience init(id: UUID, name: String, coordinate: CLLocationCoordinate2D) {
+        self.init(id: id, name: name, lat: coordinate.latitude, lon: coordinate.longitude)
+    }
+
+    public static func == (lhs: StationItem, rhs: StationItem) -> Bool { lhs.id == rhs.id }
+
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }

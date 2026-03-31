@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 
 struct EditStationView: View {
@@ -10,8 +11,8 @@ struct EditStationView: View {
     static private let defaultPointFormat = "%.5f"
 
     @State private var name: String = ""
-    @State private var longitude: Double = 0.0
-    @State private var latitude: Double = 0.0
+    @State private var latitude: CLLocationDegrees = 0.0
+    @State private var longitude: CLLocationDegrees = 0.0
 
     private let viewTitle: String
     private let confirmTitle: String

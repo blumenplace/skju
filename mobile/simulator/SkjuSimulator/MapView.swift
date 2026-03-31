@@ -59,11 +59,11 @@ final class QuakeRenderer: MKOverlayRenderer {
 
 
 struct MapView: UIViewRepresentable {
-        
+
     @Environment(QuakeGestureState.self) var quakeGestureState
 
-    var sensors: [SensorItem] = []
-    var selectedCoordinate: Coordinate? = nil
+    var sensors: [StationItem] = []
+    var selectedCoordinate: CLLocationCoordinate2D? = nil
     var onAddAt: ((Double, Double) -> Void)? = nil
     var onQuakeAt: ((Double, Double) -> Void)? = nil
 
@@ -78,37 +78,29 @@ struct MapView: UIViewRepresentable {
         mapView.addOverlay(quakeOverlay, level: .aboveLabels)
         mapView.delegate = context.coordinator
 
-        // Add force/long press drag gesture
         let quakeGesture = QuakeGestureRecognizer(target: context.coordinator)
-//        quakeGesture.onUpdate = { [weak coordinator] phase, origin, current in
-//            coordinator?.handleQuakeGestureUpdate(phase: phase, origin: origin, current: current)
-//        }
         mapView.addGestureRecognizer(quakeGesture)
 
-        // Add context menu interaction to show a popup near the press location
-        // let interaction = UIContextMenuInteraction(delegate: context.coordinator)
-        // mapView.addInteraction(interaction)
+        let interaction = UIContextMenuInteraction(delegate: context.coordinator)
+        mapView.addInteraction(interaction)
 
         return mapView
     }
 
     func updateUIView(_ uiView: MKMapView, context: Context) {
         if let sel = selectedCoordinate {
-            let center = CLLocationCoordinate2D(latitude: sel.y, longitude: sel.x)
-
+            let center = sel
             let span = MKCoordinateSpan(latitudeDelta: 1.0, longitudeDelta: 1.0)
             let region = MKCoordinateRegion(center: center, span: span)
             uiView.setRegion(region, animated: true)
         }
 
-        let existing = uiView.annotations
-        uiView.removeAnnotations(existing)
+        uiView.removeAnnotations(uiView.annotations)
 
         for sensor in sensors {
             let ann = MKPointAnnotation()
-            ann.coordinate = CLLocationCoordinate2D(
-            latitude: sensor.coordinate.y, longitude: sensor.coordinate.x)
-            ann.title = "Sensor"
+            ann.coordinate = sensor.coordinate
+            ann.title = "Seismic Station"
             uiView.addAnnotation(ann)
         }
     }
@@ -132,29 +124,24 @@ struct MapView: UIViewRepresentable {
         
         func onQuakeGestureUpdate(phase: UIGestureRecognizer.State, origin: CGPoint, current: CGPoint) {
             // Map may have moved/ zoomed, need to recalculate the coordinate
-//            let coordinate = self.parent.convert(origin, toCoordinateFrom: self.parent)
+            // let coordinate = self.parent.convert(origin, toCoordinateFrom: self.parent)
             // let coordinate = CLLocationCoordinate2D(latitude: origin.x, longitude: origin.y)
-            
+
             Task { @MainActor in
                 switch phase {
                 case .began:
-                    print("BEGAN")
                     self.parent.quakeGestureState.gestureActivated(at: origin)
 
                 case .changed:
-                    print("CHANGED")
                     self.parent.quakeGestureState.gestureMoved(to: current, coordinate: origin.asClLocationCoordinate2D)
 
                 case .ended:
-                    print("ENDED")
                     self.parent.quakeGestureState.gestureFired(coordinate: origin.asClLocationCoordinate2D)
 
                 case .failed, .cancelled:
-                    print("CANCLLED")
                     self.parent.quakeGestureState.gestureCancelled()
 
                 default:
-                    print("BREAK")
                     break
                 }
             }
@@ -174,10 +161,13 @@ struct MapView: UIViewRepresentable {
                 parent.onQuake(x: x, y: y, intensity: 0)
             }
         }
-        
-        // Allow simultaneous gestures so map interactions still work
-        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-            return false  // Set to true if you want map gestures to work simultaneously
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            // Set to true if you want map gestures to work simultaneously
+            return false
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {

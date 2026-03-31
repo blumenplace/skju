@@ -4,41 +4,20 @@ import SwiftUI
 import UIKit
 
 
-struct NewSeismicStation: Identifiable {
-    typealias ID = String
-
-    var id: Self.ID { name }
-
-    public let name: String
-    public let coordinate: CLLocationCoordinate2D
-    
-    init(name: String, coordinate: CLLocationCoordinate2D) {
-        self.name = name
-        self.coordinate = coordinate
-    }
-}
-
-
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: [SortDescriptor(\SensorItem.x), SortDescriptor(\SensorItem.y)]) private var items: [SensorItem]
 
-    @State private var selection: SensorItem? = nil
-
-    @State private var isPresentingAdd = false
-    @State private var newStationItem: NewSeismicStation? = nil
-
-    @State private var itemBeingEdited: SensorItem? = nil
-
-    @State private var pendingInitialX: Double? = nil
-    @State private var pendingInitialY: Double? = nil
+    @Query(sort: [SortDescriptor(\StationItem.id)]) private var stations: [StationItem]
+    @State private var selection: StationItem? = nil
+    @State private var newStation: StationItem? = nil
+    @State private var editedStation: StationItem? = nil
     
     @State private var quakeGesture = QuakeGestureState()
 
     var body: some View {
         NavigationSplitView {
-            List(items, selection: $selection) { item in
-                Text(item.title)
+            List(stations, selection: $selection) { item in
+                Text(item.name)
                     .tag(item)
                     .contentShape(Rectangle())
                     .onTapGesture { selection = item }
@@ -49,7 +28,7 @@ struct ContentView: View {
                             Label("Delete", systemImage: "trash")
                         }
                         Button("Edit") {
-                            itemBeingEdited = item
+                            editedStation = item
                         }
                         .tint(.blue)
                     }
@@ -61,9 +40,8 @@ struct ContentView: View {
                         Task {
                             // TODO: default coordinates will be a center of the map...
                             let coordinate = CLLocationCoordinate2D(latitude: 0.0, longitude: 0.0)
-                            let newRandomName = await generateStationName(at: coordinate)
-                            
-                            newStationItem = NewSeismicStation(name: newRandomName, coordinate: coordinate)
+                            let (id: id, name: name) = await generateStationName(at: coordinate)
+                            newStation = StationItem(id: id, name: name, coordinate: coordinate)
                         }
                     } label: {
                         Label("Add", systemImage: "plus")
@@ -73,7 +51,7 @@ struct ContentView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         if let selected = selection {
-                            itemBeingEdited = selected
+                            editedStation = selected
                         }
                     } label: {
                         Label("Edit", systemImage: "pencil")
@@ -82,12 +60,7 @@ struct ContentView: View {
                     .accessibilityLabel("Edit selected Seismic Station")
                 }
             }
-            .sheet(
-                item: $newStationItem,
-                onDismiss: {
-                    newStationItem = nil
-                }
-            ) { item in
+            .sheet(item: $newStation, onDismiss: { newStation = nil }) { item in
                 EditStationView(
                     title: "Add New Seismic Station",
                     confirmLabel: "Add",
@@ -95,40 +68,43 @@ struct ContentView: View {
                     initialY: item.coordinate.latitude,
                     name: item.name
                 ) { x, y in
-                    let new = SensorItem(x: x, y: y)
-                    modelContext.insert(new)
-                    selection = new
+//                    let new = StationItem(x: x, y: y)
+//                    modelContext.insert(new)
+//                    selection = new
+                    fatalError("Not implemented")
                 }
             }
-            .sheet(item: $itemBeingEdited) { item in
+            .sheet(item: $editedStation) { item in
                 EditStationView(
                     title: "Edit Seismic Station",
                     confirmLabel: "Update",
-                    initialX: item.coordinate.x,
-                    initialY: item.coordinate.y,
+                    initialX: item.latitude,
+                    initialY: item.longitude,
                 ) { x, y in
-                    item.x = x
-                    item.y = y
+//                    item.x = x
+//                    item.y = y
+                    fatalError("not implemented")
                 }
             }
         } detail: {
             ZStack {
                 MapView(
-                    sensors: items,
+                    sensors: stations,
                     selectedCoordinate: selection?.coordinate,
-                    onAddAt: { x, y in
-                        pendingInitialX = x
-                        pendingInitialY = y
-                        isPresentingAdd = true
+                    onAddAt: { lon, lat in
+                        Task {
+                            let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                            let (id: id, name: name) = await generateStationName(at: coordinate)
+                            newStation = StationItem(id: id, name: name, coordinate: coordinate)
+                        }
                     },
-                    onQuakeAt: { x, y in
+                    onQuakeAt: { lon, lat in
                         // TODO: launch the eather quake simulation
                     }
                 )
                 .ignoresSafeArea()
                 
-                QuakeHUDView()
-                    .ignoresSafeArea()
+                QuakeHUDView().ignoresSafeArea()
             }.environment(quakeGesture)
         }
     }

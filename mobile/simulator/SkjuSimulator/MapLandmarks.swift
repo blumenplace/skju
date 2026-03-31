@@ -1,15 +1,19 @@
 import MapKit
 
 
-func generateStationName(at coordinate: CLLocationCoordinate2D) async -> String {
+func generateStationName(at coordinate: CLLocationCoordinate2D) async -> (id: UUID, name: String) {
+    let uuid = UUID()
+
     guard let items = try? await nearestLandmarks(to: coordinate),
           let nearest = items.first,
           let landmarkName = nearest.name,
           let prefix = StationAdjectives.all.randomElement(),
           let suffix = StationNouns.all.randomElement()
-    else { return randomStationName() }
+    else {
+        return (id: uuid, name: uuid.uuidString)
+    }
 
-    return "\(prefix) \(landmarkName) \(suffix)"
+    return (id: uuid, name: "\(prefix) \(landmarkName) \(suffix)")
 }
 
 private func nearestLandmarks(to coordinate: CLLocationCoordinate2D) async throws -> [MKMapItem] {
@@ -32,10 +36,6 @@ private func nearestLandmarks(to coordinate: CLLocationCoordinate2D) async throw
     let results = try await search.start()
 
     return results.mapItems
-}
-
-private func randomStationName() -> String {
-    return UUID().uuidString
 }
 
 private enum StationNouns {
