@@ -46,20 +46,16 @@ struct EditStationView: View {
 
                 Section(header: Text("Coordinates")) {
                     TextField("Longitude", value: $longitude, format: Self.defaultCoordinateFormat)
-                        .keyboardType(.decimalPad)
-                        .textContentType(.oneTimeCode)
+                        .coordinateField()
                         .accessibilityLabel("Longitude coordinate")
-                        .disableAutocorrection(true)
                         .onAppear { longitude = station.longitude }
                         .onChange(of: longitude) { _, v in
                             longitude = v.clamped(to: Self.validLongitude)
                         }
 
                     TextField("Latitude", value: $latitude, format: Self.defaultCoordinateFormat)
-                        .keyboardType(.decimalPad)
-                        .textContentType(.oneTimeCode)
+                        .coordinateField()
                         .accessibilityLabel("Latitude coordinate")
-                        .disableAutocorrection(true)
                         .onAppear { latitude = station.latitude }
                         .onChange(of: latitude) { _, v in
                             latitude = v.clamped(to: Self.validLatitude)
@@ -85,6 +81,15 @@ struct EditStationView: View {
                 }
             }
         }
+    }
+}
+
+private extension TextField {
+    func coordinateField() -> some View {
+        self
+            .keyboardType(.decimalPad)
+            .textContentType(.oneTimeCode)
+            .disableAutocorrection(true)
     }
 }
 
