@@ -116,10 +116,10 @@ struct MapView: UIViewRepresentable {
     class Coordinator: NSObject, MKMapViewDelegate, UIContextMenuInteractionDelegate,
                        QuakeGestureRecognizerDelegate
     {
-        var parent: MapView
+        var map: MapView
 
         init(_ parent: MapView) {
-            self.parent = parent
+            self.map = parent
         }
         
         func onQuakeGestureUpdate(phase: UIGestureRecognizer.State, origin: CGPoint, current: CGPoint) {
@@ -130,16 +130,16 @@ struct MapView: UIViewRepresentable {
             Task { @MainActor in
                 switch phase {
                 case .began:
-                    self.parent.quakeGestureState.gestureActivated(at: origin)
+                    self.map.quakeGestureState.gestureActivated(at: origin)
 
                 case .changed:
-                    self.parent.quakeGestureState.gestureMoved(to: current, coordinate: origin.asClLocationCoordinate2D)
+                    self.map.quakeGestureState.gestureMoved(to: current, coordinate: origin.asClLocationCoordinate2D)
 
                 case .ended:
-                    self.parent.quakeGestureState.gestureFired(coordinate: origin.asClLocationCoordinate2D)
+                    self.map.quakeGestureState.gestureFired(coordinate: origin.asClLocationCoordinate2D)
 
                 case .failed, .cancelled:
-                    self.parent.quakeGestureState.gestureCancelled()
+                    self.map.quakeGestureState.gestureCancelled()
 
                 default:
                     break
@@ -158,7 +158,7 @@ struct MapView: UIViewRepresentable {
                 let x = coord.longitude
                 let y = coord.latitude
 
-                parent.onQuake(x: x, y: y, intensity: 0)
+                map.onQuake(x: x, y: y, intensity: 0)
             }
         }
 
@@ -205,12 +205,12 @@ struct MapView: UIViewRepresentable {
             return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
                 let add = UIAction(title: "Add New Seismic Station", image: UIImage(systemName: "plus")) {
                   [weak self] _ in
-                  self?.parent.onAddAt?(x, y)
+                  self?.map.onAddAt?(x, y)
                 }
                 let quake = UIAction(
                     title: "Trigger Earth Quake",
                     image: UIImage(systemName: "waveform.path.ecg"))
-                { [weak self] _ in self?.parent.onQuakeAt?(x, y) }
+                { [weak self] _ in self?.map.onQuakeAt?(x, y) }
                 return UIMenu(title: "Map", children: [add, quake])
             }
         }
