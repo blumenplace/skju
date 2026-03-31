@@ -5,9 +5,9 @@ import CoreLocation
 @Model final public class StationItem: Identifiable, Hashable {
     public var id: UUID
 
-    private(set) var name: String
-    private(set) var latitude: CLLocationDegrees
-    private(set) var longitude: CLLocationDegrees
+    var name: String
+    var latitude: CLLocationDegrees
+    var longitude: CLLocationDegrees
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)

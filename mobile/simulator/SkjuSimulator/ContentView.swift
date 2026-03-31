@@ -64,26 +64,19 @@ struct ContentView: View {
                 EditStationView(
                     title: "Add New Seismic Station",
                     confirmLabel: "Add",
-                    initialX: item.coordinate.longitude,
-                    initialY: item.coordinate.latitude,
-                    name: item.name
-                ) { x, y in
-//                    let new = StationItem(x: x, y: y)
-//                    modelContext.insert(new)
-//                    selection = new
-                    fatalError("Not implemented")
+                    station: item
+                ) {
+                    modelContext.insert(item)
+                    selection = item
                 }
             }
             .sheet(item: $editedStation) { item in
                 EditStationView(
                     title: "Edit Seismic Station",
                     confirmLabel: "Update",
-                    initialX: item.latitude,
-                    initialY: item.longitude,
-                ) { x, y in
-//                    item.x = x
-//                    item.y = y
-                    fatalError("not implemented")
+                    station: item,
+                ) {
+                    selection = item
                 }
             }
         } detail: {
