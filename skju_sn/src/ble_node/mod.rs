@@ -11,7 +11,7 @@ use futures::future::{Either, select};
 use futures::pin_mut;
 use nrf_softdevice::Softdevice;
 use nrf_softdevice::ble::{Connection, gatt_server, peripheral};
-
+use crate::constants::BLE_BATCH_SIZE;
 use crate::mpu_sensor::readings::ReadingsChannel;
 
 static CENTRAL_TIMESTAMP_OFFSET: BlockingMutex<CriticalSectionRawMutex, Cell<i64>> = BlockingMutex::new(Cell::new(0));
@@ -64,18 +64,18 @@ pub async fn advertise_ble(
 
 async fn process_sensor_data(connection: &Connection, server: &ReadingsServer, channel: &'static ReadingsChannel) {
     loop {
-        let mut batch = channel.receiver().receive().await;
+        let mut readings = channel.receiver().receive().await;
 
         if !NOTIFY_ENABLED.load(Ordering::Acquire) {
             Timer::after_millis(1000).await;
             continue;
         }
 
-        if let Err(err) = batch.adjust_timestamp(CENTRAL_TIMESTAMP_OFFSET.lock(|v| v.get())) {
+        if let Err(err) = readings.adjust_timestamp(CENTRAL_TIMESTAMP_OFFSET.lock(|v| v.get())) {
             defmt::error!("Failed to adjust timestamp: {:?}", err);
             continue;
         }
-
-        let _ = server.readings.readings_notify(connection, &batch.bytes());
+        
+        let _ = server.readings.readings_notify(connection, &readings.into());
     }
 }

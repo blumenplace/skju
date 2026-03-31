@@ -5,22 +5,13 @@ use crate::constants::{BLE_BATCH_SIZE, MAX_SAMPLE_COUNT, SAMPLE_SIZE, TIMESTAMP_
 
 pub type ReadingsChannel = Channel<CriticalSectionRawMutex, Readings, 1>;
 
+#[derive(Debug, Clone, Copy)]
 pub struct Readings {
     pub batch_timestamp: u64,
     pub readings: [u8; MAX_SAMPLE_COUNT * SAMPLE_SIZE],
 }
 
 impl Readings {
-    pub fn bytes(&self) -> [u8; BLE_BATCH_SIZE] {
-        let timestamp_bytes: [u8; TIMESTAMP_BYTES] = self.batch_timestamp.to_be_bytes();
-        let mut batch_bytes = [0x00; BLE_BATCH_SIZE];
-
-        batch_bytes[..TIMESTAMP_BYTES].copy_from_slice(&timestamp_bytes);
-        batch_bytes[TIMESTAMP_BYTES..].copy_from_slice(&self.readings[..BLE_BATCH_SIZE]);
-
-        batch_bytes
-    }
-
     pub fn adjust_timestamp(&mut self, timestamp_diff: i64) -> Result<(), &'static str> {
         let new_timestamp = self.batch_timestamp as i64 + timestamp_diff;
 
@@ -49,5 +40,32 @@ impl Readings {
 
             defmt::info!("S{} ACC[x:{} y:{} z:{}] GYR[x:{} y:{} z:{}]", i, ax, ay, az, gx, gy, gz);
         }
+    }
+}
+
+impl From<[u8; BLE_BATCH_SIZE]> for Readings {
+    fn from(batch: [u8; BLE_BATCH_SIZE]) -> Self {
+        let mut readings = [0x00u8; SAMPLE_SIZE * MAX_SAMPLE_COUNT];
+        let mut timestamp = [0x00u8; TIMESTAMP_BYTES];
+
+        timestamp.copy_from_slice(&batch[..TIMESTAMP_BYTES]);
+        readings.copy_from_slice(&batch[TIMESTAMP_BYTES..]);
+
+        Self {
+            batch_timestamp: u64::from_be_bytes(timestamp),
+            readings,
+        }
+    }
+}
+
+impl Into<[u8; BLE_BATCH_SIZE]> for Readings {
+    fn into(self) -> [u8; BLE_BATCH_SIZE] {
+        let timestamp_bytes: [u8; TIMESTAMP_BYTES] = self.batch_timestamp.to_be_bytes();
+        let mut batch_bytes = [0x00; BLE_BATCH_SIZE];
+
+        batch_bytes[..TIMESTAMP_BYTES].copy_from_slice(&timestamp_bytes);
+        batch_bytes[TIMESTAMP_BYTES..].copy_from_slice(&self.readings[..BLE_BATCH_SIZE]);
+
+        batch_bytes
     }
 }

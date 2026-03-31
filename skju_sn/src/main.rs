@@ -30,7 +30,7 @@ use nrf_softdevice::raw::ble_gap_addr_t;
 use {defmt_rtt as _, panic_probe as _};
 
 #[cfg(feature = "ble-bridge")]
-use crate::ble_bridge::{process_ble_connection, scan_available_nodes};
+use crate::ble_bridge::{process_sensor_readings, scan_ble_devices};
 #[cfg(feature = "ble-node")]
 use crate::ble_node::advertise_ble;
 #[cfg(feature = "ble-node")]
@@ -87,30 +87,18 @@ async fn main(spawner: Spawner) {
     {
         let softdevice_config = ble_bridge::ble_central::get_softdevice_config();
         let softdevice = Softdevice::enable(&softdevice_config);
-        let mut connected_nodes = Vec::<ble_gap_addr_t, 100>::new();
 
         spawner
             .spawn(softdevice_task(softdevice))
             .expect("softdevice task failed to spawn");
 
-        loop {
-            let peer_addr = scan_available_nodes(&softdevice).await;
-            let is_connected = connected_nodes.iter().any(|addr| addr.addr == peer_addr.addr);
+        spawner
+            .spawn(scan_ble_devices(softdevice, spawner.clone(), &READINGS_CHANNEL))
+            .expect("scan_ble_devices task failed to spawn");
 
-            if is_connected {
-                defmt::info!("Already connected");
-                continue;
-            } else {
-                defmt::info!("Connected to a new sensor node");
-                connected_nodes
-                    .push(peer_addr)
-                    .expect("Unable to push to connected BLE devices");
-            }
-
-            spawner
-                .spawn(process_ble_connection(softdevice, peer_addr))
-                .expect("process_ble_connection task failed to spawn");
-        }
+        spawner
+            .spawn(process_sensor_readings(&READINGS_CHANNEL))
+            .expect("process_sensor_readings task failed to spawn");
     }
 }
 
