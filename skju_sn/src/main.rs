@@ -35,10 +35,9 @@ use crate::ble_bridge::{process_sensor_readings, scan_ble_devices};
 use crate::ble_node::advertise_ble;
 #[cfg(feature = "ble-node")]
 use crate::ble_node::ble_peripheral::{ReadingsServer, get_softdevice_config};
+use crate::mpu_sensor::readings::ReadingsChannel;
 use crate::mpu_sensor::{handle_mpu_interrupts, init_mpu};
-use crate::mpu_sensor::readings::ReadingsChannel;=
 
-#[cfg(feature = "mpu-sensor")]
 bind_interrupts!(struct Irqs {
     SPI2 => spim::InterruptHandler<peripherals::SPI2>;
     UARTE0 => uarte::InterruptHandler<peripherals::UARTE0>;
@@ -90,11 +89,10 @@ async fn main(spawner: Spawner) {
     {
         let softdevice_config = ble_bridge::ble_central::get_softdevice_config();
         let softdevice = Softdevice::enable(&softdevice_config);
-        let config = uarte::Config {
-            parity: uarte::Parity::EXCLUDED,
-            baudrate: uarte::Baudrate::BAUD115200,
-            ..Default::default()
-        };
+        let mut config = uarte::Config::default();
+        
+        config.parity = uarte::Parity::EXCLUDED;
+        config.baudrate = uarte::Baudrate::BAUD115200;
 
         let uart = uarte::Uarte::new(p.UARTE0, p.P1_02, p.P1_03, Irqs, config);
 

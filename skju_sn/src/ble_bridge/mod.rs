@@ -16,7 +16,7 @@ use nrf_softdevice::raw::{ble_gap_addr_t, ble_gap_evt_adv_report_t};
 use nrf_softdevice::{Softdevice, ble};
 
 use crate::ble_bridge::ble_central::{ReadingsServiceClient, ReadingsServiceClientEvent};
-use crate::constants::{BLE_SENSOR_NAME, TIMESTAMP_BYTES, TOTAL_SENSORS};
+use crate::constants::{BLE_BATCH_SIZE, BLE_SENSOR_NAME, TIMESTAMP_BYTES, TOTAL_SENSORS};
 use crate::mpu_sensor::readings::ReadingsChannel;
 
 pub mod ble_central;
@@ -24,26 +24,23 @@ pub mod ble_central;
 static TIMESTAMP_SYNC: Channel<CriticalSectionRawMutex, (), 1> = Channel::new();
 
 #[embassy_executor::task]
-pub async fn process_sensor_readings(mut uart: Uarte, readings_channel: &'static ReadingsChannel) {
+pub async fn process_sensor_readings(mut uart: Uarte<'static>, readings_channel: &'static ReadingsChannel) {
     let mut unix_timestamp_base = get_unix_timestamp_base(&mut uart).await;
+    let mut last_timestamp_sync = Instant::now();
 
-    let readings_future = async {
-        loop {
-            let mut readings = readings_channel.receiver().receive().await;
+    loop {
+        let mut readings = readings_channel.receiver().receive().await;
+        let time_elapsed = Instant::elapsed(&last_timestamp_sync).as_secs() > 60;
+        let _ = readings.adjust_timestamp(unix_timestamp_base as i64);
+        let bytes: [u8; BLE_BATCH_SIZE] = readings.into();
 
-            readings.batch_timestamp += unix_timestamp_base;
-            uart.write(&readings.into()).await.expect("Failed to write readings");
-        }
-    };
+        uart.write(&bytes).await.expect("Failed to write readings");
 
-    let timestamp_sync_future = async {
-        loop {
+        if time_elapsed {
+            last_timestamp_sync = Instant::now();
             unix_timestamp_base = get_unix_timestamp_base(&mut uart).await;
-            Timer::after_millis(60_000).await;
         }
-    };
-
-    let _ = select(readings_future, timestamp_sync_future).await;
+    }
 }
 
 #[embassy_executor::task]
@@ -189,7 +186,7 @@ fn is_skju_sensor_ad(params: &ble_gap_evt_adv_report_t) -> bool {
     }
 }
 
-async fn get_unix_timestamp_base(uart: &mut Uarte) -> u64 {
+async fn get_unix_timestamp_base(uart: &mut Uarte<'static>) -> u64 {
     let mut timestamp_buffer = [0u8; TIMESTAMP_BYTES];
 
     uart.write(&[42u8]).await.expect("Failed to notify timestamp sync");
