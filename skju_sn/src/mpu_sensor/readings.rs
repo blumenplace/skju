@@ -45,8 +45,8 @@ impl Readings {
 
 impl From<[u8; BLE_BATCH_SIZE]> for Readings {
     fn from(batch: [u8; BLE_BATCH_SIZE]) -> Self {
-        let mut readings = [0x00u8; SAMPLE_SIZE * MAX_SAMPLE_COUNT];
-        let mut timestamp = [0x00u8; TIMESTAMP_BYTES];
+        let mut readings = [0u8; SAMPLE_SIZE * MAX_SAMPLE_COUNT];
+        let mut timestamp = [0u8; TIMESTAMP_BYTES];
 
         timestamp.copy_from_slice(&batch[..TIMESTAMP_BYTES]);
         readings.copy_from_slice(&batch[TIMESTAMP_BYTES..]);

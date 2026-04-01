@@ -1,9 +1,10 @@
 use core::slice::from_raw_parts;
 
 use embassy_executor::Spawner;
+use embassy_nrf::uarte::Uarte;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
-use embassy_time::Instant;
+use embassy_time::{Instant, Timer};
 use futures::future::{Either, select};
 use futures::pin_mut;
 use heapless::Vec;
@@ -15,7 +16,7 @@ use nrf_softdevice::raw::{ble_gap_addr_t, ble_gap_evt_adv_report_t};
 use nrf_softdevice::{Softdevice, ble};
 
 use crate::ble_bridge::ble_central::{ReadingsServiceClient, ReadingsServiceClientEvent};
-use crate::constants::{BLE_SENSOR_NAME, TOTAL_SENSORS};
+use crate::constants::{BLE_SENSOR_NAME, TIMESTAMP_BYTES, TOTAL_SENSORS};
 use crate::mpu_sensor::readings::ReadingsChannel;
 
 pub mod ble_central;
@@ -23,13 +24,26 @@ pub mod ble_central;
 static TIMESTAMP_SYNC: Channel<CriticalSectionRawMutex, (), 1> = Channel::new();
 
 #[embassy_executor::task]
-pub async fn process_sensor_readings(readings_channel: &'static ReadingsChannel) {
-    // TODO: init UART connection with nrf9, wait for first unix timestamp sync, then proceed with readings / sync
-    // TODO: convert local timestamps for readings to unix timestamps
-    loop {
-        let readings = readings_channel.receiver().receive().await;
-        defmt::info!("Received readings: {}", readings.readings);
-    }
+pub async fn process_sensor_readings(mut uart: Uarte, readings_channel: &'static ReadingsChannel) {
+    let mut unix_timestamp_base = get_unix_timestamp_base(&mut uart).await;
+
+    let readings_future = async {
+        loop {
+            let mut readings = readings_channel.receiver().receive().await;
+
+            readings.batch_timestamp += unix_timestamp_base;
+            uart.write(&readings.into()).await.expect("Failed to write readings");
+        }
+    };
+
+    let timestamp_sync_future = async {
+        loop {
+            unix_timestamp_base = get_unix_timestamp_base(&mut uart).await;
+            Timer::after_millis(60_000).await;
+        }
+    };
+
+    let _ = select(readings_future, timestamp_sync_future).await;
 }
 
 #[embassy_executor::task]
@@ -173,4 +187,18 @@ fn is_skju_sensor_ad(params: &ble_gap_evt_adv_report_t) -> bool {
 
         false
     }
+}
+
+async fn get_unix_timestamp_base(uart: &mut Uarte) -> u64 {
+    let mut timestamp_buffer = [0u8; TIMESTAMP_BYTES];
+
+    uart.write(&[42u8]).await.expect("Failed to notify timestamp sync");
+    uart.read(&mut timestamp_buffer)
+        .await
+        .expect("Failed to read timestamp");
+
+    let current_unix_timestamp = u64::from_be_bytes(timestamp_buffer);
+    let unix_timestamp_base = current_unix_timestamp - Instant::now().as_millis();
+
+    unix_timestamp_base
 }

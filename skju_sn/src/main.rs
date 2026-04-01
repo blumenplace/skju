@@ -21,7 +21,7 @@ use embassy_nrf::config::Config;
 use embassy_nrf::gpio::{Input, Level, Output, OutputDrive, Pull};
 use embassy_nrf::interrupt::{InterruptExt, Priority};
 use embassy_nrf::spim::Spim;
-use embassy_nrf::{bind_interrupts, peripherals, spim};
+use embassy_nrf::{bind_interrupts, peripherals, spim, uarte};
 use embassy_sync::channel::Channel;
 use heapless::Vec;
 use nrf_softdevice::Softdevice;
@@ -36,11 +36,12 @@ use crate::ble_node::advertise_ble;
 #[cfg(feature = "ble-node")]
 use crate::ble_node::ble_peripheral::{ReadingsServer, get_softdevice_config};
 use crate::mpu_sensor::handle_mpu_interrupts;
-use crate::mpu_sensor::readings::ReadingsChannel;
+use crate::mpu_sensor::readings::ReadingsChannel;=
 
 #[cfg(feature = "mpu-sensor")]
 bind_interrupts!(struct Irqs {
     SPI2 => spim::InterruptHandler<peripherals::SPI2>;
+    UARTE0 => uarte::InterruptHandler<peripherals::UARTE0>;
 });
 
 static READINGS_CHANNEL: ReadingsChannel = Channel::new();
@@ -55,6 +56,7 @@ async fn main(spawner: Spawner) {
     let p = embassy_nrf::init(config);
 
     embassy_nrf::interrupt::SPI2.set_priority(Priority::P3);
+    embassy_nrf::interrupt::UARTE0.set_priority(Priority::P3);
 
     #[cfg(feature = "mpu-sensor")]
     {
@@ -87,6 +89,13 @@ async fn main(spawner: Spawner) {
     {
         let softdevice_config = ble_bridge::ble_central::get_softdevice_config();
         let softdevice = Softdevice::enable(&softdevice_config);
+        let config = uarte::Config {
+            parity: uarte::Parity::EXCLUDED,
+            baudrate: uarte::Baudrate::BAUD115200,
+            ..Default::default()
+        };
+
+        let mut uart = uarte::Uarte::new(p.UARTE0, p.P1_02, p.P1_03, Irqs, config);
 
         spawner
             .spawn(softdevice_task(softdevice))
