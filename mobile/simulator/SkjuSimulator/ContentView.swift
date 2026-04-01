@@ -11,7 +11,7 @@ struct ContentView: View {
     @State private var selection: StationItem? = nil
     @State private var newStation: StationItem? = nil
     @State private var editedStation: StationItem? = nil
-    
+    @State private var currentMapCenter: CLLocationCoordinate2D? = nil
     @State private var quakeGesture = QuakeGestureState()
 
     var body: some View {
@@ -38,10 +38,9 @@ struct ContentView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         Task {
-                            // TODO: default coordinates will be a center of the map...
-                            let coordinate = CLLocationCoordinate2D(latitude: 0.0, longitude: 0.0)
-                            let (id: id, name: name) = await generateStationName(at: coordinate)
-                            newStation = StationItem(id: id, name: name, coordinate: coordinate)
+                            let coordinates = currentMapCenter ?? CLLocationCoordinate2D(latitude: 0.0, longitude: 0.0)
+                            let (id: id, name: name) = await generateStationName(at: coordinates)
+                            newStation = StationItem(id: id, name: name, coordinate: coordinates)
                         }
                     } label: {
                         Label("Add", systemImage: "plus")
@@ -82,6 +81,7 @@ struct ContentView: View {
         } detail: {
             ZStack {
                 MapView(
+                    mapCenter: $currentMapCenter,
                     sensors: stations,
                     selectedCoordinate: selection?.coordinate,
                     onAddAt: { lon, lat in

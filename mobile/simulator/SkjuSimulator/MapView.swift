@@ -61,6 +61,8 @@ final class QuakeRenderer: MKOverlayRenderer {
 struct MapView: UIViewRepresentable {
 
     @Environment(QuakeGestureState.self) var quakeGestureState
+    
+    @Binding var mapCenter: CLLocationCoordinate2D?
 
     var sensors: [StationItem] = []
     var selectedCoordinate: CLLocationCoordinate2D? = nil
@@ -168,6 +170,11 @@ struct MapView: UIViewRepresentable {
         ) -> Bool {
             // Set to true if you want map gestures to work simultaneously
             return false
+        }
+
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            let center = mapView.region.center
+            map.mapCenter = center
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
