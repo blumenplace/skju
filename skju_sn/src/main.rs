@@ -35,7 +35,7 @@ use crate::ble_bridge::{process_sensor_readings, scan_ble_devices};
 use crate::ble_node::advertise_ble;
 #[cfg(feature = "ble-node")]
 use crate::ble_node::ble_peripheral::{ReadingsServer, get_softdevice_config};
-use crate::mpu_sensor::handle_mpu_interrupts;
+use crate::mpu_sensor::{handle_mpu_interrupts, init_mpu};
 use crate::mpu_sensor::readings::ReadingsChannel;=
 
 #[cfg(feature = "mpu-sensor")]
@@ -64,9 +64,10 @@ async fn main(spawner: Spawner) {
         let spim = Spim::new(p.SPI2, Irqs, p.P0_27, p.P0_26, p.P0_29, spim_config);
         let mpu_cs: Output = Output::new(p.P0_30, Level::High, OutputDrive::Standard);
         let mpu_int: Input = Input::new(p.P0_31, Pull::Up);
+        let mpu6500 = init_mpu(spim, mpu_cs).await;
 
         spawner
-            .spawn(handle_mpu_interrupts(spim, mpu_cs, mpu_int, &READINGS_CHANNEL))
+            .spawn(handle_mpu_interrupts(mpu6500, mpu_int, &READINGS_CHANNEL))
             .expect("mpu interrupt task failed to spawn");
     }
 
@@ -95,7 +96,7 @@ async fn main(spawner: Spawner) {
             ..Default::default()
         };
 
-        let mut uart = uarte::Uarte::new(p.UARTE0, p.P1_02, p.P1_03, Irqs, config);
+        let uart = uarte::Uarte::new(p.UARTE0, p.P1_02, p.P1_03, Irqs, config);
 
         spawner
             .spawn(softdevice_task(softdevice))
@@ -106,7 +107,7 @@ async fn main(spawner: Spawner) {
             .expect("scan_ble_devices task failed to spawn");
 
         spawner
-            .spawn(process_sensor_readings(&READINGS_CHANNEL))
+            .spawn(process_sensor_readings(uart, &READINGS_CHANNEL))
             .expect("process_sensor_readings task failed to spawn");
     }
 }

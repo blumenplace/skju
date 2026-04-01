@@ -19,15 +19,14 @@ use mpu6500::user_control::UserControlConfig;
 use self::readings::{Readings, ReadingsChannel};
 use self::spi::SpiDeviceBus;
 use crate::constants::{MAX_SAMPLE_COUNT, SAMPLE_RATE_HZ, SAMPLE_SIZE};
+use crate::mpu_sensor::timer::TimerHandler;
 
 #[embassy_executor::task]
 pub async fn handle_mpu_interrupts(
-    spim: Spim<'static>,
-    mpu_cs: Output<'static>,
+    mut mpu6500: MPU6500<SpiDeviceBus, TimerHandler>,
     mut int_pin: Input<'static>,
     channel: &'static ReadingsChannel,
 ) {
-    let mut mpu6500 = init_mpu(spim, mpu_cs).await;
     let who = mpu6500.read_register(WHO_AM_I).await;
     let fifo_layout = mpu6500.fifo_layout().await;
 
@@ -67,7 +66,7 @@ pub async fn handle_mpu_interrupts(
     }
 }
 
-async fn init_mpu(spim: Spim<'static>, mpu_cs: Output<'static>) -> MPU6500<SpiDeviceBus, timer::TimerHandler> {
+pub async fn init_mpu(spim: Spim<'static>, mpu_cs: Output<'static>) -> MPU6500<SpiDeviceBus, timer::TimerHandler> {
     let spim: Mutex<NoopRawMutex, Spim<'static>> = Mutex::new(spim);
     let spi_bus = SpiDeviceBus::new(spim, mpu_cs);
     let fifo_sensors = FIFOSensors::GYRO_X | FIFOSensors::GYRO_Y | FIFOSensors::GYRO_Z | FIFOSensors::ACCEL;
