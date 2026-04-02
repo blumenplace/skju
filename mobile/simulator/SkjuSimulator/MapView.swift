@@ -83,8 +83,17 @@ struct MapView: UIViewRepresentable {
         let quakeGesture = QuakeGestureRecognizer(target: context.coordinator)
         mapView.addGestureRecognizer(quakeGesture)
 
-        let interaction = UIContextMenuInteraction(delegate: context.coordinator)
-        mapView.addInteraction(interaction)
+//        let interaction = UIContextMenuInteraction(delegate: context.coordinator)
+//        mapView.addInteraction(interaction)
+        
+        let menuTap = UILongPressGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.menuTap(_:))
+        )
+        menuTap.minimumPressDuration = 0.4
+        menuTap.numberOfTouchesRequired = 2
+        menuTap.numberOfTapsRequired = 1
+        mapView.addGestureRecognizer(menuTap)
 
         return mapView
     }
@@ -115,7 +124,8 @@ struct MapView: UIViewRepresentable {
         print("QUAKE AT \(x), \(y) with intensity \(intensity)")
     }
 
-    class Coordinator: NSObject, MKMapViewDelegate, UIContextMenuInteractionDelegate,
+    class Coordinator: NSObject, MKMapViewDelegate,
+                       // UIContextMenuInteractionDelegate,
                        QuakeGestureRecognizerDelegate
     {
         var map: MapView
@@ -123,6 +133,47 @@ struct MapView: UIViewRepresentable {
         init(_ parent: MapView) {
             self.map = parent
         }
+        
+        @objc func menuTap(_ gesture: UILongPressGestureRecognizer) {
+            guard let mapView = gesture.view as? MKMapView else { return }
+
+            let location = gesture.location(in: mapView)
+            let coord = mapView.convert(location, toCoordinateFrom: mapView)
+            let x = coord.longitude
+            let y = coord.latitude
+            
+            // Create and present the menu as an alert or action sheet
+            let alert = UIAlertController(title: "Map", message: nil, preferredStyle: .actionSheet)
+            
+            alert.addAction(UIAlertAction(title: "Add New Seismic Station", style: .default) { [weak self] _ in
+                self?.map.onAddAt?(x, y)
+            })
+            
+            alert.addAction(UIAlertAction(title: "Trigger Earth Quake", style: .default) { [weak self] _ in
+                self?.map.onQuakeAt?(x, y)
+            })
+            
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            
+            // Present from the root view controller
+            if let windowScene = mapView.window?.windowScene,
+               let rootVC = windowScene.windows.first?.rootViewController {
+                // Find the topmost presented view controller
+                var topVC = rootVC
+                while let presented = topVC.presentedViewController {
+                    topVC = presented
+                }
+                
+                // For iPad, set the popover source
+                if let popover = alert.popoverPresentationController {
+                    popover.sourceView = mapView
+                    popover.sourceRect = CGRect(origin: location, size: .zero)
+                }
+                
+                topVC.present(alert, animated: true)
+            }
+        }
+        
         
         func onQuakeGestureUpdate(phase: UIGestureRecognizer.State, origin: CGPoint, current: CGPoint) {
             // Map may have moved/ zoomed, need to recalculate the coordinate
