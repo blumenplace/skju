@@ -1,81 +1,131 @@
-pub mod ble_peripheral;
+mod ble_peripheral;
 
-use core::cell::Cell;
-use core::sync::atomic::{AtomicBool, Ordering};
-
-use ble_peripheral::{ADV_DATA, ReadingsServer, ReadingsServerEvent, ReadingsServiceEvent, SCAN_DATA};
-use embassy_sync::blocking_mutex::Mutex as BlockingMutex;
+pub use ble_peripheral::*;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::mutex::Mutex;
+use embassy_sync::signal::Signal;
 use embassy_time::{Instant, Timer};
-use futures::future::{Either, select};
+use futures::future::{Either, join, select};
 use futures::pin_mut;
+use heapless::{Deque, Vec};
 use nrf_softdevice::Softdevice;
-use nrf_softdevice::ble::{Connection, gatt_server, peripheral};
-use crate::constants::BLE_BATCH_SIZE;
-use crate::mpu_sensor::readings::ReadingsChannel;
+use nrf_softdevice::ble::gatt_server::NotifyValueError;
+use nrf_softdevice::ble::peripheral::{ConnectableAdvertisement, advertise_connectable};
+use nrf_softdevice::ble::{Connection, gatt_server};
 
-static CENTRAL_TIMESTAMP_OFFSET: BlockingMutex<CriticalSectionRawMutex, Cell<i64>> = BlockingMutex::new(Cell::new(0));
-static NOTIFY_ENABLED: AtomicBool = AtomicBool::new(false);
+use crate::mpu_sensor::readings::{Readings, ReadingsChannel};
+
+static NOTIFICATION_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
+static TIMESTAMP_SIGNAL: Signal<CriticalSectionRawMutex, i64> = Signal::new();
+static READINGS_QUEUE: Mutex<CriticalSectionRawMutex, Deque<Readings, 100>> = Mutex::new(Deque::new());
 
 #[embassy_executor::task]
-pub async fn advertise_ble(
-    sd: &'static Softdevice,
-    server: ReadingsServer,
-    readings_channel: &'static ReadingsChannel,
-) {
+pub async fn advertise_ble(sd: &'static Softdevice, server: ReadingsServer) {
     loop {
-        let config = peripheral::Config::default();
-        let adv = peripheral::ConnectableAdvertisement::ScannableUndirected {
-            adv_data: &ADV_DATA,
-            scan_data: &SCAN_DATA,
+        if READINGS_QUEUE.lock().await.is_empty() {
+            Timer::after_millis(1000).await;
+            continue;
+        }
+
+        let timeout_future = Timer::after_millis(2000);
+        let advertisement_future = async {
+            let adv = ConnectableAdvertisement::ScannableUndirected {
+                adv_data: &ADV_DATA,
+                scan_data: &SCAN_DATA,
+            };
+
+            advertise_connectable(&sd, adv, &Default::default())
+                .await
+                .expect("Adv connection failed")
         };
 
-        defmt::info!("Waiting for connection...");
+        pin_mut!(advertisement_future);
+        pin_mut!(timeout_future);
 
-        let connection: Connection = peripheral::advertise_connectable(&sd, adv, &config)
-            .await
-            .expect("Adv connection failed");
+        let result: Option<Connection> = match select(advertisement_future, timeout_future).await {
+            Either::Left((connection, _)) => Some(connection),
+            Either::Right(_) => None,
+        };
+
+        let Some(connection) = result else {
+            Timer::after_millis(500).await;
+            continue;
+        };
 
         let gatt_future = gatt_server::run(&connection, &server, |server_event| match server_event {
             ReadingsServerEvent::Readings(e) => match e {
                 ReadingsServiceEvent::ReadingsCccdWrite { notifications } => {
-                    NOTIFY_ENABLED.store(notifications, Ordering::Release);
+                    NOTIFICATION_SIGNAL.signal(notifications);
                 }
                 ReadingsServiceEvent::CentralTimestampWrite(curr_central_timestamp) => {
                     let curr_local_timestamp = Instant::now().as_millis();
                     let timestamp_diff = curr_central_timestamp as i64 - curr_local_timestamp as i64;
 
-                    CENTRAL_TIMESTAMP_OFFSET.lock(|v| v.set(timestamp_diff));
+                    TIMESTAMP_SIGNAL.signal(timestamp_diff);
                 }
             },
         });
 
-        let reading_process_future = process_sensor_data(&connection, &server, readings_channel);
+        let reading_process_future = process_sensor_data(&connection, &server);
 
         pin_mut!(gatt_future);
         pin_mut!(reading_process_future);
 
         let _ = match select(gatt_future, reading_process_future).await {
-            Either::Left(_) => defmt::info!("Readings processing error"),
-            Either::Right(_) => defmt::info!("Connection lost"),
+            Either::Left(_) => defmt::info!("Connection lost"),
+            Either::Right(_) => defmt::info!("Readings processing error"),
         };
+
+        NOTIFICATION_SIGNAL.reset();
+        TIMESTAMP_SIGNAL.reset();
+
+        Timer::after_millis(500).await;
     }
 }
 
-async fn process_sensor_data(connection: &Connection, server: &ReadingsServer, channel: &'static ReadingsChannel) {
+#[embassy_executor::task]
+pub async fn collect_readings(readings_channel: &'static ReadingsChannel) {
     loop {
-        let mut readings = channel.receiver().receive().await;
+        let readings = readings_channel.receiver().receive().await;
+        let mut queue = READINGS_QUEUE.lock().await;
 
-        if !NOTIFY_ENABLED.load(Ordering::Acquire) {
-            Timer::after_millis(1000).await;
-            continue;
+        if queue.is_full() {
+            queue.pop_front().expect("cannot pop despite queue being full");
         }
 
-        if let Err(err) = readings.adjust_timestamp(CENTRAL_TIMESTAMP_OFFSET.lock(|v| v.get())) {
-            defmt::error!("Failed to adjust timestamp: {:?}", err);
-            continue;
+        queue
+            .push_back(readings)
+            .expect("cannot push despite queue not being full");
+    }
+}
+
+async fn process_sensor_data(connection: &Connection, server: &ReadingsServer) {
+    if READINGS_QUEUE.lock().await.is_empty() {
+        return;
+    }
+
+    let timeout_future = Timer::after_millis(1000);
+    let notify_future = join(NOTIFICATION_SIGNAL.wait(), TIMESTAMP_SIGNAL.wait());
+    let len = READINGS_QUEUE.lock().await.len();
+    let timestamp_offset = match select(timeout_future, notify_future).await {
+        Either::Left(_) => return,
+        Either::Right(((_, offset), _)) => offset,
+    };
+
+    for _ in 0..len {
+        let batch = READINGS_QUEUE
+            .lock()
+            .await
+            .pop_front()
+            .expect("cannot pop despite queue not being empty");
+
+        let bytes = batch.into();
+        loop {
+            match server.readings.readings_notify(connection, &bytes) {
+                Ok(_) => break,
+                Err(NotifyValueError::Disconnected) => return,
+                Err(_) => Timer::after_millis(10).await,
+            }
         }
-        
-        let _ = server.readings.readings_notify(connection, &readings.into());
     }
 }

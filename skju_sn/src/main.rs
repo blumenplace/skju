@@ -20,21 +20,17 @@ use embassy_executor::Spawner;
 use embassy_nrf::config::Config;
 use embassy_nrf::gpio::{Input, Level, Output, OutputDrive, Pull};
 use embassy_nrf::interrupt::{InterruptExt, Priority};
+use embassy_nrf::pac::FICR;
 use embassy_nrf::spim::Spim;
 use embassy_nrf::{bind_interrupts, peripherals, spim, uarte};
 use embassy_sync::channel::Channel;
-use heapless::Vec;
 use nrf_softdevice::Softdevice;
-#[cfg(feature = "ble-bridge")]
-use nrf_softdevice::raw::ble_gap_addr_t;
 use {defmt_rtt as _, panic_probe as _};
 
 #[cfg(feature = "ble-bridge")]
 use crate::ble_bridge::{process_sensor_readings, scan_ble_devices};
 #[cfg(feature = "ble-node")]
-use crate::ble_node::advertise_ble;
-#[cfg(feature = "ble-node")]
-use crate::ble_node::ble_peripheral::{ReadingsServer, get_softdevice_config};
+use crate::ble_node::{ReadingsServer, advertise_ble, collect_readings, get_softdevice_config};
 use crate::mpu_sensor::readings::ReadingsChannel;
 use crate::mpu_sensor::{handle_mpu_interrupts, init_mpu};
 
@@ -48,6 +44,7 @@ static READINGS_CHANNEL: ReadingsChannel = Channel::new();
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
     let mut config = Config::default();
+    let device_id = get_device_id();
 
     config.gpiote_interrupt_priority = Priority::P2;
     config.time_interrupt_priority = Priority::P2;
@@ -66,7 +63,7 @@ async fn main(spawner: Spawner) {
         let mpu6500 = init_mpu(spim, mpu_cs).await;
 
         spawner
-            .spawn(handle_mpu_interrupts(mpu6500, mpu_int, &READINGS_CHANNEL))
+            .spawn(handle_mpu_interrupts(device_id, mpu6500, mpu_int, &READINGS_CHANNEL))
             .expect("mpu interrupt task failed to spawn");
     }
 
@@ -81,7 +78,11 @@ async fn main(spawner: Spawner) {
             .expect("softdevice task failed to spawn");
 
         spawner
-            .spawn(advertise_ble(softdevice, server, &READINGS_CHANNEL))
+            .spawn(collect_readings(&READINGS_CHANNEL))
+            .expect("collect_readings task failed to spawn");
+
+        spawner
+            .spawn(advertise_ble(softdevice, server))
             .expect("advertising task failed to spawn");
     }
 
@@ -90,7 +91,7 @@ async fn main(spawner: Spawner) {
         let softdevice_config = ble_bridge::ble_central::get_softdevice_config();
         let softdevice = Softdevice::enable(&softdevice_config);
         let mut config = uarte::Config::default();
-        
+
         config.parity = uarte::Parity::EXCLUDED;
         config.baudrate = uarte::Baudrate::BAUD115200;
 
@@ -113,4 +114,13 @@ async fn main(spawner: Spawner) {
 #[embassy_executor::task]
 async fn softdevice_task(sd: &'static Softdevice) {
     sd.run().await
+}
+
+fn get_device_id() -> u64 {
+    let id_low = FICR.deviceid(0).read();
+    let id_high = FICR.deviceid(1).read();
+
+    let device_id: u64 = ((id_high as u64) << 32) | (id_low as u64);
+
+    device_id
 }

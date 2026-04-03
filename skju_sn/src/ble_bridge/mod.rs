@@ -43,6 +43,7 @@ pub async fn process_sensor_readings(mut uart: Uarte<'static>, readings_channel:
     }
 }
 
+// TODO: change implementation to scan/sleep cycle
 #[embassy_executor::task]
 pub async fn scan_ble_devices(
     softdevice: &'static Softdevice,

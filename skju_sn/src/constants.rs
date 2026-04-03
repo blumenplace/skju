@@ -1,7 +1,8 @@
 pub const TOTAL_SENSORS: u8 = 3;
 pub const TIMESTAMP_BYTES: usize = 8;
 pub const MAX_SAMPLE_COUNT: usize = 10;
-pub const SAMPLE_SIZE: usize = 12;
-pub const BLE_BATCH_SIZE: usize = MAX_SAMPLE_COUNT * SAMPLE_SIZE + TIMESTAMP_BYTES;
+pub const SAMPLE_BYTES: usize = 12;
+pub const DEVICE_ID_BYTES: usize = 8;
+pub const BLE_BATCH_SIZE: usize = MAX_SAMPLE_COUNT * SAMPLE_BYTES + TIMESTAMP_BYTES + DEVICE_ID_BYTES;
 pub const SAMPLE_RATE_HZ: u64 = 100;
 pub const BLE_SENSOR_NAME: &str = "SKJU-SN";
