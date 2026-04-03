@@ -13,6 +13,9 @@ use nrf_softdevice::ble::gatt_server::NotifyValueError;
 use nrf_softdevice::ble::peripheral::{ConnectableAdvertisement, advertise_connectable};
 use nrf_softdevice::ble::{Connection, gatt_server};
 
+use crate::constants::{
+    BLE_PERI_ADVERTISEMENT_DURATION, BLE_PERI_ADVERTISEMENT_INTERVAL, BLE_PERI_NOTIFICATION_WINDOW,
+};
 use crate::mpu_sensor::readings::{Readings, ReadingsChannel};
 
 static NOTIFICATION_SIGNAL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
@@ -23,11 +26,11 @@ static READINGS_QUEUE: Mutex<CriticalSectionRawMutex, Deque<Readings, 100>> = Mu
 pub async fn advertise_ble(sd: &'static Softdevice, server: ReadingsServer) {
     loop {
         if READINGS_QUEUE.lock().await.is_empty() {
-            Timer::after_millis(1000).await;
+            Timer::after_millis(BLE_PERI_ADVERTISEMENT_INTERVAL).await;
             continue;
         }
 
-        let timeout_future = Timer::after_millis(2000);
+        let timeout_future = Timer::after_millis(BLE_PERI_ADVERTISEMENT_DURATION);
         let advertisement_future = async {
             let adv = ConnectableAdvertisement::ScannableUndirected {
                 adv_data: &ADV_DATA,
@@ -42,14 +45,12 @@ pub async fn advertise_ble(sd: &'static Softdevice, server: ReadingsServer) {
         pin_mut!(advertisement_future);
         pin_mut!(timeout_future);
 
-        let result: Option<Connection> = match select(advertisement_future, timeout_future).await {
-            Either::Left((connection, _)) => Some(connection),
-            Either::Right(_) => None,
-        };
-
-        let Some(connection) = result else {
-            Timer::after_millis(500).await;
-            continue;
+        let connection = match select(advertisement_future, timeout_future).await {
+            Either::Left((connection, _)) => connection,
+            Either::Right(_) => {
+                Timer::after_millis(BLE_PERI_ADVERTISEMENT_INTERVAL).await;
+                continue;
+            }
         };
 
         let gatt_future = gatt_server::run(&connection, &server, |server_event| match server_event {
@@ -79,7 +80,7 @@ pub async fn advertise_ble(sd: &'static Softdevice, server: ReadingsServer) {
         NOTIFICATION_SIGNAL.reset();
         TIMESTAMP_SIGNAL.reset();
 
-        Timer::after_millis(500).await;
+        Timer::after_millis(BLE_PERI_ADVERTISEMENT_INTERVAL).await;
     }
 }
 
@@ -100,11 +101,7 @@ pub async fn collect_readings(readings_channel: &'static ReadingsChannel) {
 }
 
 async fn process_sensor_data(connection: &Connection, server: &ReadingsServer) {
-    if READINGS_QUEUE.lock().await.is_empty() {
-        return;
-    }
-
-    let timeout_future = Timer::after_millis(1000);
+    let timeout_future = Timer::after_millis(BLE_PERI_NOTIFICATION_WINDOW);
     let notify_future = join(NOTIFICATION_SIGNAL.wait(), TIMESTAMP_SIGNAL.wait());
     let len = READINGS_QUEUE.lock().await.len();
     let timestamp_offset = match select(timeout_future, notify_future).await {
@@ -113,13 +110,15 @@ async fn process_sensor_data(connection: &Connection, server: &ReadingsServer) {
     };
 
     for _ in 0..len {
-        let batch = READINGS_QUEUE
+        let mut batch = READINGS_QUEUE
             .lock()
             .await
             .pop_front()
             .expect("cannot pop despite queue not being empty");
 
+        let _ = batch.adjust_timestamp(timestamp_offset);
         let bytes = batch.into();
+
         loop {
             match server.readings.readings_notify(connection, &bytes) {
                 Ok(_) => break,

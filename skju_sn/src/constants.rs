@@ -6,3 +6,6 @@ pub const DEVICE_ID_BYTES: usize = 8;
 pub const BLE_BATCH_SIZE: usize = MAX_SAMPLE_COUNT * SAMPLE_BYTES + TIMESTAMP_BYTES + DEVICE_ID_BYTES;
 pub const SAMPLE_RATE_HZ: u64 = 100;
 pub const BLE_SENSOR_NAME: &str = "SKJU-SN";
+pub const BLE_PERI_ADVERTISEMENT_DURATION: u64 = 2000;
+pub const BLE_PERI_ADVERTISEMENT_INTERVAL: u64 = 1000;
+pub const BLE_PERI_NOTIFICATION_WINDOW: u64 = 1000; // How long to wait for enabled notifications before dropping the connection
