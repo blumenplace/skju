@@ -19,6 +19,10 @@ pub fn get_softdevice_config() -> nrf_softdevice::Config {
             central_sec_count: 0,
             _bitfield_1: Default::default(),
         }),
+        conn_gap: Some(nrf_softdevice::raw::ble_gap_conn_cfg_t {
+            conn_count: TOTAL_SENSORS,
+            event_length: 24,
+        }),
         conn_gatt: Some(nrf_softdevice::raw::ble_gatt_conn_cfg_t { att_mtu: 247 }),
         ..Default::default()
     }

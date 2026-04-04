@@ -25,6 +25,11 @@ pub struct ReadingsServer {
 
 pub fn get_softdevice_config() -> nrf_softdevice::Config {
     nrf_softdevice::Config {
+        conn_gap: Some(nrf_softdevice::raw::ble_gap_conn_cfg_t {
+            conn_count: 1,
+            event_length: 24,
+        }),
+        conn_gatts: Some(nrf_softdevice::raw::ble_gatts_conn_cfg_t { hvn_tx_queue_size: 3 }),
         conn_gatt: Some(nrf_softdevice::raw::ble_gatt_conn_cfg_t { att_mtu: 247 }),
         ..Default::default()
     }

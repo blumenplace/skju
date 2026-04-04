@@ -1,4 +1,5 @@
 use core::slice::from_raw_parts;
+use core::sync::atomic::{AtomicU8, Ordering};
 
 use embassy_executor::Spawner;
 use embassy_nrf::uarte::Uarte;
@@ -16,12 +17,23 @@ use nrf_softdevice::raw::{ble_gap_addr_t, ble_gap_evt_adv_report_t};
 use nrf_softdevice::{Softdevice, ble};
 
 use crate::ble_bridge::ble_central::{ReadingsServiceClient, ReadingsServiceClientEvent};
-use crate::constants::{BLE_BATCH_SIZE, BLE_SENSOR_NAME, TIMESTAMP_BYTES, TOTAL_SENSORS};
+use crate::constants::{
+    BLE_BATCH_SIZE, BLE_CENTRAL_SCAN_DURATION, BLE_CENTRAL_SCAN_INTERVAL, BLE_SENSOR_NAME, TIMESTAMP_BYTES,
+    TOTAL_SENSORS,
+};
 use crate::mpu_sensor::readings::ReadingsChannel;
 
 pub mod ble_central;
 
-static TIMESTAMP_SYNC: Channel<CriticalSectionRawMutex, (), 1> = Channel::new();
+static CURR_CONNECTIONS: AtomicU8 = AtomicU8::new(0);
+
+struct ConnectionGuard;
+
+impl Drop for ConnectionGuard {
+    fn drop(&mut self) {
+        CURR_CONNECTIONS.fetch_sub(1, Ordering::Release);
+    }
+}
 
 #[embassy_executor::task]
 pub async fn process_sensor_readings(mut uart: Uarte<'static>, readings_channel: &'static ReadingsChannel) {
@@ -43,7 +55,6 @@ pub async fn process_sensor_readings(mut uart: Uarte<'static>, readings_channel:
     }
 }
 
-// TODO: change implementation to scan/sleep cycle
 #[embassy_executor::task]
 pub async fn scan_ble_devices(
     softdevice: &'static Softdevice,
@@ -51,19 +62,43 @@ pub async fn scan_ble_devices(
     readings_channel: &'static ReadingsChannel,
 ) {
     loop {
-        let mut connected_nodes = Vec::<ble_gap_addr_t, 100>::new();
+        while CURR_CONNECTIONS.load(Ordering::Acquire) != 0 {
+            defmt::info!("Waiting for connections to finish...");
+            Timer::after_millis(BLE_CENTRAL_SCAN_INTERVAL).await;
+            continue;
+        }
+
+        defmt::info!("START SCANNING!");
+
+        let timeout_future = Timer::after_millis(BLE_CENTRAL_SCAN_DURATION);
+        let ble_scan_future = do_ble_scan(softdevice, spawner, readings_channel);
+
+        pin_mut!(timeout_future);
+        pin_mut!(ble_scan_future);
+
+        let _ = select(timeout_future, ble_scan_future).await;
+
+        Timer::after_millis(BLE_CENTRAL_SCAN_INTERVAL).await;
+    }
+}
+
+async fn do_ble_scan(softdevice: &'static Softdevice, spawner: Spawner, readings_channel: &'static ReadingsChannel) {
+    let mut connected_nodes = Vec::<ble_gap_addr_t, 100>::new();
+
+    loop {
         let peer_addr = scan_available_nodes(softdevice).await;
         let is_connected = connected_nodes.iter().any(|addr| addr.addr == peer_addr.addr);
 
         if is_connected {
-            defmt::info!("Already connected");
+            defmt::info!("Already connected to a sensor node, skipping...");
             continue;
-        } else {
-            defmt::info!("Connected to a new sensor node");
-            connected_nodes
-                .push(peer_addr)
-                .expect("Unable to push to connected BLE devices");
         }
+
+        CURR_CONNECTIONS.fetch_add(1, Ordering::Release);
+
+        connected_nodes
+            .push(peer_addr)
+            .expect("Unable to push to connected BLE devices");
 
         spawner
             .spawn(process_ble_connection(softdevice, peer_addr, readings_channel))
@@ -77,63 +112,54 @@ async fn process_ble_connection(
     peer_addr: ble_gap_addr_t,
     readings_channel: &'static ReadingsChannel,
 ) {
+    let _guard = ConnectionGuard;
     let addrs = &[&Address::from_raw(peer_addr)];
     let mut config = ConnectConfig::default();
-    let mut last_timestamp_sync = Instant::now();
-    let mut already_synced = false;
 
     config.scan_config.whitelist = Some(addrs);
+    config.scan_config.interval = 8;
+    config.scan_config.window = 8;
+    config.conn_params = nrf_softdevice::raw::ble_gap_conn_params_t {
+        min_conn_interval: 16,
+        max_conn_interval: 16,
+        slave_latency: 0,
+        conn_sup_timeout: 400,
+    };
 
-    let connection = central::connect(sd, &config).await.expect("Failed to connect");
-    let client: ReadingsServiceClient = discover(&connection).await.expect("Failed to discover ReadingsService");
+    let Ok(connection) = central::connect(sd, &config).await else {
+        return;
+    };
+
+    let Ok(client): Result<ReadingsServiceClient, _> = discover(&connection).await else {
+        return;
+    };
+
+    let conn_interval_millis = (connection.conn_params().min_conn_interval * 5 / 4) as u64;
+    let shared_central_timestamp = Instant::now().as_millis() + conn_interval_millis;
 
     client
         .readings_cccd_write(true)
         .await
         .expect("Failed to enable notifications");
 
-    let gatt_client_future = ble::gatt_client::run(&connection, &client, |event| match event {
-        ReadingsServiceClientEvent::ReadingsNotification(batch) => {
-            let time_elapsed = Instant::elapsed(&last_timestamp_sync).as_secs() > 60;
+    // TODO: define a custom event to schedule the timestamp sync afterwards
+    client
+        .central_timestamp_write(&shared_central_timestamp)
+        .await
+        .expect("Failed to write central timestamp");
 
+    // TODO: consider handling disconnects that are not of type BleDisconnectReason::ExchangeComplete
+    ble::gatt_client::run(&connection, &client, |event| match event {
+        ReadingsServiceClientEvent::ReadingsNotification(batch) => {
             readings_channel
                 .sender()
                 .try_send(batch.into())
-                .expect("Unable to send readings to channel");
-
-            if time_elapsed || !already_synced {
-                already_synced = true;
-                last_timestamp_sync = Instant::now();
-
-                TIMESTAMP_SYNC
-                    .sender()
-                    .try_send(())
-                    .expect("Unable to fire timestamp sync");
-            }
+                .expect("Failed to send readings");
         }
-    });
+    })
+    .await;
 
-    let timestamp_sync_feature = async {
-        loop {
-            let conn_interval_millis = (connection.conn_params().min_conn_interval * 5 / 4) as u64;
-            let shared_central_timestamp = Instant::now().as_millis() + conn_interval_millis;
-
-            client
-                .central_timestamp_write(&shared_central_timestamp)
-                .await
-                .expect("Failed to write central timestamp");
-        }
-    };
-
-    pin_mut!(gatt_client_future);
-    pin_mut!(timestamp_sync_feature);
-
-    let _ = match select(gatt_client_future, timestamp_sync_feature).await {
-        Either::Left(_) => defmt::info!("GATT Client error"),
-        Either::Right(_) => defmt::info!("Unable to process readings"),
-    };
-
-    defmt::info!("connection to {} lost", peer_addr.addr);
+    defmt::info!("Disconnected from peer: {}", peer_addr.addr);
 }
 
 async fn scan_available_nodes(softdevice: &Softdevice) -> ble_gap_addr_t {

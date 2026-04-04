@@ -9,6 +9,7 @@ compile_error!("ble-bridge and sensor-node features cannot be enabled at the sam
 #[cfg(not(any(feature = "ble-bridge", feature = "ble-node")))]
 compile_error!("sensor-node or ble-bridge features should be enabled");
 
+mod ble;
 #[cfg(feature = "ble-bridge")]
 mod ble_bridge;
 #[cfg(feature = "ble-node")]

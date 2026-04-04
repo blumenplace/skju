@@ -1,20 +1,23 @@
 mod ble_peripheral;
 
 pub use ble_peripheral::*;
+use defmt::println;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_sync::signal::Signal;
 use embassy_time::{Instant, Timer};
 use futures::future::{Either, join, select};
 use futures::pin_mut;
-use heapless::{Deque, Vec};
-use nrf_softdevice::Softdevice;
+use heapless::Deque;
 use nrf_softdevice::ble::gatt_server::NotifyValueError;
 use nrf_softdevice::ble::peripheral::{ConnectableAdvertisement, advertise_connectable};
-use nrf_softdevice::ble::{Connection, gatt_server};
+use nrf_softdevice::ble::{Connection, DisconnectedError, HciStatus, gatt_server};
+use nrf_softdevice::{RawError, Softdevice};
 
+use crate::ble::BleDisconnectReason;
 use crate::constants::{
-    BLE_PERI_ADVERTISEMENT_DURATION, BLE_PERI_ADVERTISEMENT_INTERVAL, BLE_PERI_NOTIFICATION_WINDOW,
+    BLE_COMPLETE_EXCHANGE_REASON, BLE_PERI_ADVERTISEMENT_DURATION, BLE_PERI_ADVERTISEMENT_INTERVAL,
+    BLE_PERI_NOTIFICATION_WINDOW,
 };
 use crate::mpu_sensor::readings::{Readings, ReadingsChannel};
 
@@ -37,9 +40,11 @@ pub async fn advertise_ble(sd: &'static Softdevice, server: ReadingsServer) {
                 scan_data: &SCAN_DATA,
             };
 
-            advertise_connectable(&sd, adv, &Default::default())
+            let result = advertise_connectable(&sd, adv, &Default::default())
                 .await
-                .expect("Adv connection failed")
+                .expect("Adv connection failed");
+
+            result
         };
 
         pin_mut!(advertisement_future);
@@ -52,6 +57,9 @@ pub async fn advertise_ble(sd: &'static Softdevice, server: ReadingsServer) {
                 continue;
             }
         };
+
+        NOTIFICATION_SIGNAL.reset();
+        TIMESTAMP_SIGNAL.reset();
 
         let gatt_future = gatt_server::run(&connection, &server, |server_event| match server_event {
             ReadingsServerEvent::Readings(e) => match e {
@@ -73,12 +81,14 @@ pub async fn advertise_ble(sd: &'static Softdevice, server: ReadingsServer) {
         pin_mut!(reading_process_future);
 
         let _ = match select(gatt_future, reading_process_future).await {
-            Either::Left(_) => defmt::info!("Connection lost"),
-            Either::Right(_) => defmt::info!("Readings processing error"),
+            Either::Left(_) => {
+                defmt::info!("Connection lost...");
+            }
+            Either::Right((_, gatt_fut)) => {
+                defmt::info!("Readings processing complete, disconnecting...");
+                gatt_fut.await;
+            }
         };
-
-        NOTIFICATION_SIGNAL.reset();
-        TIMESTAMP_SIGNAL.reset();
 
         Timer::after_millis(BLE_PERI_ADVERTISEMENT_INTERVAL).await;
     }
@@ -101,15 +111,18 @@ pub async fn collect_readings(readings_channel: &'static ReadingsChannel) {
 }
 
 async fn process_sensor_data(connection: &Connection, server: &ReadingsServer) {
+    let len = READINGS_QUEUE.lock().await.len();
     let timeout_future = Timer::after_millis(BLE_PERI_NOTIFICATION_WINDOW);
     let notify_future = join(NOTIFICATION_SIGNAL.wait(), TIMESTAMP_SIGNAL.wait());
-    let len = READINGS_QUEUE.lock().await.len();
+
     let timestamp_offset = match select(timeout_future, notify_future).await {
         Either::Left(_) => return,
         Either::Right(((_, offset), _)) => offset,
     };
 
-    for _ in 0..len {
+    defmt::info!("Sending {} readings to the central.", len);
+
+    for i in 0..len {
         let mut batch = READINGS_QUEUE
             .lock()
             .await
@@ -123,8 +136,16 @@ async fn process_sensor_data(connection: &Connection, server: &ReadingsServer) {
             match server.readings.readings_notify(connection, &bytes) {
                 Ok(_) => break,
                 Err(NotifyValueError::Disconnected) => return,
-                Err(_) => Timer::after_millis(10).await,
+                Err(NotifyValueError::Raw(raw_error)) => match raw_error {
+                    RawError::Resources => Timer::after_millis(10).await,
+                    RawError::Busy => Timer::after_millis(1).await,
+                    _ => return,
+                },
             }
         }
     }
+
+    defmt::info!("batches after drain remaining: {}", READINGS_QUEUE.lock().await.len());
+
+    connection.disconnect().expect("Failed to disconnect");
 }

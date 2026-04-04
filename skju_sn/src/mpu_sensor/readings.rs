@@ -3,7 +3,7 @@ use embassy_sync::channel::Channel;
 
 use crate::constants::{BLE_BATCH_SIZE, DEVICE_ID_BYTES, MAX_SAMPLE_COUNT, SAMPLE_BYTES, TIMESTAMP_BYTES};
 
-pub type ReadingsChannel = Channel<CriticalSectionRawMutex, Readings, 1>;
+pub type ReadingsChannel = Channel<CriticalSectionRawMutex, Readings, 300>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Readings {
@@ -39,7 +39,7 @@ impl Readings {
             let gy = i16::from_be_bytes([samples[offset + 8], samples[offset + 9]]);
             let gz = i16::from_be_bytes([samples[offset + 10], samples[offset + 11]]);
 
-            defmt::info!("S{} ACC[x:{} y:{} z:{}] GYR[x:{} y:{} z:{}]", i, ax, ay, az, gx, gy, gz);
+            defmt::info!("S{}; ACC({}, {}, {}); GYR({}, {}, {})", i, ax, ay, az, gx, gy, gz);
         }
     }
 }
