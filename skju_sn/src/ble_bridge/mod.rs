@@ -83,7 +83,7 @@ pub async fn scan_ble_devices(
 }
 
 async fn do_ble_scan(softdevice: &'static Softdevice, spawner: Spawner, readings_channel: &'static ReadingsChannel) {
-    let mut connected_nodes = Vec::<ble_gap_addr_t, 100>::new();
+    let mut connected_nodes = Vec::<ble_gap_addr_t, { TOTAL_SENSORS as usize }>::new();
 
     loop {
         let peer_addr = scan_available_nodes(softdevice).await;
@@ -96,13 +96,15 @@ async fn do_ble_scan(softdevice: &'static Softdevice, spawner: Spawner, readings
 
         CURR_CONNECTIONS.fetch_add(1, Ordering::Release);
 
-        connected_nodes
-            .push(peer_addr)
-            .expect("Unable to push to connected BLE devices");
-
+        connected_nodes.push(peer_addr).ok();
         spawner
             .spawn(process_ble_connection(softdevice, peer_addr, readings_channel))
             .expect("process_ble_connection task failed to spawn");
+
+        if connected_nodes.is_full() {
+            defmt::info!("All sensors connected, stopping BLE scan");
+            break;
+        }
     }
 }
 
