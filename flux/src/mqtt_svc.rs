@@ -140,6 +140,71 @@ impl tower::Service<tokio::net::TcpStream> for TcpMqttService {
     }
 }
 
+struct MqttService {
+    events_topic: String,
+    shutdown: CancellationToken,
+}
+
+impl tower::Service<Vec<GenericEvent<u16>>> for TcpMqttService {
+    type Response = ();
+    type Error = SvcError;
+    type Future = std::pin::Pin<Box<dyn Future<Output=StdResult<(), SvcError>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut TaskContext<'_>) -> Poll<StdResult<(), SvcError>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, events: Vec<GenericEvent<u16>>) -> Self::Future {
+        let events_topic = self.events_topic.clone();
+        let fut = async move {
+            for event in events {
+                match event {
+                    Event::NotifyPacketReceived(packet) => {
+                        tracing::info!(?packet, "received mqtt packet");
+                        match packet {
+                            GenericPacket::<u16>::V5_0Publish(publish) => {
+                                let topic = publish.topic_name();
+                                if topic == events_topic {
+                                    let payload = publish.payload().as_slice();
+                                    let _event: pods::Event = bytemuck::try_pod_read_unaligned(payload)
+                                        .map_err(|e| SvcError::MalformedEventStructure(e.to_string()))?;
+                                    dbg!(&_event);
+                                } else {
+                                    tracing::warn!(topic = ?topic, "received non-events topic");
+                                }
+                            },
+                            other => {
+                                tracing::info!(?other, "received non-publish packet");
+                            }
+                        }
+                    },
+                    Event::RequestSendPacket {
+                        packet: _,
+                        release_packet_id_if_send_error: _,
+                    } => {
+                        todo!("send packet");
+                    },
+                    Event::RequestTimerReset { .. } => {},
+                    Event::RequestTimerCancel(_) => {},
+                    Event::NotifyError(mqtt_error) => {
+                        tracing::error!(?mqtt_error, "mqtt error");
+                        return Err(SvcError::MqttError(mqtt_error))
+                    },
+                    Event::RequestClose => {
+                        tracing::info!("mqtt connection requested close");
+                        return Ok(());
+                    },
+                    Event::NotifyPacketIdReleased(_) => todo!(),
+                }
+            }
+
+            Ok(())
+        };
+
+        Box::pin(fut)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
