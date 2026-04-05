@@ -1,6 +1,6 @@
 use std::result::Result as StdResult;
-use rama::Context;
-use rama::graceful::ShutdownGuard;
+use std::task::{Context as TaskContext, Poll};
+use tokio_util::sync::CancellationToken;
 use mqtt_protocol_core::mqtt::{
     Connection, Version,
     connection::{Event, role::Server, GenericEvent},
@@ -9,6 +9,7 @@ use mqtt_protocol_core::mqtt::{
 };
 use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt};
 use crate::pods;
+
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SvcError {
@@ -22,67 +23,57 @@ pub(crate) enum SvcError {
 
 pub(crate) struct MqttService {
     events_topic: String,
-    shutdown: ShutdownGuard,
+    shutdown: CancellationToken,
 }
 
-impl<S, Stream> rama::Service<S, Stream> for MqttService
-where
-    Stream: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-{
-    type Response = ();
-    type Error = SvcError;
+impl MqttService {
+    pub(crate) fn new(events_topic: String, shutdown: CancellationToken) -> Self {
+        Self { events_topic, shutdown }
+    }
 
-    fn serve<'a>(&'a self, ctx: Context<S>, mut stream: Stream) -> impl Future<Output=StdResult<Self::Response, Self::Error>> + Send + 'a
+    pub(crate) async fn serve<Stream>(&self, mut stream: Stream) -> StdResult<(), SvcError>
+    where
+        Stream: AsyncRead + AsyncWrite + Unpin + Send,
     {
         let mut server = Connection::<Server>::new(Version::V5_0);
         let mut read_buf = [0u8; 8 * 1024];
         let mut inbound: Vec<u8> = Vec::with_capacity(16 * 1024);
 
-        async move {
-            loop {
-                let n = tokio::select! {
-                    _ = self.shutdown.shutdown_signal_triggered() => {
-                        tracing::info!("mqtt service shutdown triggered");
-                        // let left_events = server.notify_closed();
-                        return Ok(());
-                    },
-                    res = stream.read(&mut read_buf) => {
-                        let n = res.map_err(SvcError::IoError)?;
-                        n
-                    },
-                };
-
-                if n == 0 {
-                    tracing::info!("mqtt client disconnected");
-                    // let left_events = server.notify_closed();
+        loop {
+            let n = tokio::select! {
+                _ = self.shutdown.cancelled() => {
+                    tracing::info!("mqtt service shutdown triggered");
                     return Ok(());
+                },
+                res = stream.read(&mut read_buf) => {
+                    let n = res.map_err(SvcError::IoError)?;
+                    n
+                },
+            };
+
+            if n == 0 {
+                tracing::info!("mqtt client disconnected");
+                return Ok(());
+            }
+
+            inbound.extend_from_slice(&read_buf[..n]);
+
+            loop {
+                let mut cursor = MqttCursor::new(&inbound[..]);
+                let events = server.recv(&mut cursor);
+                if events.is_empty() {
+                    break;
                 }
 
-                inbound.extend_from_slice(&read_buf[..n]);
+                self.handle_mqtt_events(events)?;
 
-                loop {
-                    let mut cursor = MqttCursor::new(&inbound[..]);
-                    let events = server.recv(&mut cursor);
-                    if events.is_empty() {
-                        break;
-                    }
-
-                    self.handle_mqtt_events(events)?;
-
-                    let consumed = cursor.position() as usize;
-                    if consumed == 0 {
-                        break;
-                    }
-                    inbound.drain(..consumed);
+                let consumed = cursor.position() as usize;
+                if consumed == 0 {
+                    break;
                 }
+                inbound.drain(..consumed);
             }
         }
-    }
-}
-
-impl MqttService {
-    pub(crate) fn new(events_topic: String, shutdown: ShutdownGuard) -> Self {
-        Self { events_topic, shutdown }
     }
 
     fn handle_mqtt_events(&self, events: Vec<GenericEvent<u16>>) -> Result<(), SvcError> {
@@ -90,13 +81,14 @@ impl MqttService {
             match event {
                 Event::NotifyPacketReceived(packet) => {
                     tracing::info!(?packet, "received mqtt packet");
-                    match packet {
+                         match packet {
                         GenericPacket::<u16>::V5_0Publish(publish) => {
                             let topic = publish.topic_name();
                             if topic == self.events_topic {
                                 let payload = publish.payload().as_slice();
-                                let _event: &pods::Event = bytemuck::try_from_bytes(payload).map_err(|e| SvcError::MalformedEventStructure(e.to_string()))?;
-                                // todo!("write data to Kafka");
+                                let _event: pods::Event = bytemuck::try_pod_read_unaligned(payload)
+                                    .map_err(|e| SvcError::MalformedEventStructure(e.to_string()))?;
+                                dbg!(&_event);
                             } else {
                                 tracing::warn!(topic = ?topic, "received non-events topic");
                             }
@@ -107,8 +99,8 @@ impl MqttService {
                     }
                 },
                 Event::RequestSendPacket {
-                    packet,
-                    release_packet_id_if_send_error,
+                    packet: _,
+                    release_packet_id_if_send_error: _,
                 } => {
                     todo!("send packet");
                 },
@@ -130,19 +122,35 @@ impl MqttService {
     }
 }
 
+impl tower::Service<tokio::net::TcpStream> for MqttService {
+    type Response = ();
+    type Error = SvcError;
+    type Future = std::pin::Pin<Box<dyn Future<Output = StdResult<(), SvcError>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut TaskContext<'_>) -> Poll<StdResult<(), SvcError>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, stream: tokio::net::TcpStream) -> Self::Future {
+        let events_topic = self.events_topic.clone();
+        let shutdown = self.shutdown.clone();
+        Box::pin(async move {
+            MqttService::new(events_topic, shutdown).serve(stream).await
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rama::graceful::Shutdown;
     use tokio::io::{duplex, AsyncWriteExt};
     use std::time::Duration;
     use tokio::sync::Notify;
     use std::sync::Arc;
-    use rama::Service;
 
-    #[tokio::test] // (flavor = "multi_thread", worker_threads = 4)
+    #[tokio::test]
     async fn test_mqtt_service_publish() {
-        let shutdown = Shutdown::builder().build();
+        let token = CancellationToken::new();
         let (mut ostream, istream) = duplex(1024);
 
         let svc_started = Arc::new(Notify::new());
@@ -150,13 +158,11 @@ mod tests {
 
         let events_topic = "test-topic";
         let et = events_topic.to_string();
-        let handle = shutdown.spawn_task_fn(move |guard| {
-            let svc = MqttService::new(et, guard);
-            let ss = ss.clone();
-            async move {
-                ss.notify_one();
-                svc.serve(Context::default(), istream).await
-            }
+        let child_token = token.clone();
+        let handle = tokio::spawn(async move {
+            let svc = MqttService::new(et, child_token);
+            ss.notify_one();
+            svc.serve(istream).await
         });
 
         svc_started.notified().await;
@@ -169,8 +175,12 @@ mod tests {
         // Give some time for the service to process the message
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let _ = shutdown.shutdown_with_limit(Duration::from_secs(1)).await;
-        let result = handle.await.expect("task panicked");
+        token.cancel();
+        let result = tokio::time::timeout(Duration::from_secs(1), handle)
+            .await
+            .expect("timed out")
+            .expect("task panicked");
+        println!("error: {:?}", result);
         assert!(result.is_ok());
     }
 
@@ -209,24 +219,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_mqtt_service_shutdown() {
-        let shutdown = Shutdown::builder().build();
+        let token = CancellationToken::new();
         let (_ostream, istream) = duplex(1024);
 
         let svc_started = Arc::new(Notify::new());
         let ss = Arc::clone(&svc_started);
 
-        let handle = shutdown.spawn_task_fn(|guard| async move {
-            let svc = MqttService::new("test-topic".to_string(), guard);
+        let child_token = token.clone();
+        let handle = tokio::spawn(async move {
+            let svc = MqttService::new("test-topic".to_string(), child_token);
             ss.notify_one();
-            svc.serve(Context::default(), istream).await
+            svc.serve(istream).await
         });
 
         svc_started.notified().await;
 
-        let shutdown_res = shutdown.shutdown_with_limit(Duration::from_secs(1)).await;
-        assert!(shutdown_res.is_ok(), "must successfully shutdown");
-
-        let result = handle.await.expect("task panicked");
+        token.cancel();
+        let result = tokio::time::timeout(Duration::from_secs(1), handle)
+            .await
+            .expect("timed out")
+            .expect("task panicked");
         assert!(result.is_ok());
     }
 }

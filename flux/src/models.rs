@@ -5,7 +5,7 @@ pub(crate) struct Location {
 
 pub(crate) type ReadingValue = i32;
 
-pub(crate) type SensorId = u32;
+pub(crate) type SensorId = u64;
 
 pub(crate) struct Reading {
     pub x: ReadingValue,

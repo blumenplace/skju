@@ -1,7 +1,9 @@
 use serde::{Serialize, Deserialize};
 use crate::{ReadingValue, SensorId};
+use bytemuck::{AnyBitPattern, Pod, Zeroable};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Default)]
 pub(crate) struct Event {
     sensor_id: SensorId,
     gyro_x: ReadingValue,
@@ -12,36 +14,17 @@ pub(crate) struct Event {
     accel_z: ReadingValue,
 }
 
-unsafe impl bytemuck::Zeroable for Event {}
+/// SAFETY: All fields are Zeroable.
+unsafe impl Zeroable for Event {}
 
-unsafe impl bytemuck::Pod for Event {}
+/// SAFETY: All fields in the struct implement Pod
+///     the struct implement repr(C), it is packed and fields are defined from biggest to smallest.
+///     and there are no generics.
+unsafe impl Pod for Event {}
 
-// impl From<crate::Event> for Event {
-//     fn from(value: crate::Event) -> Self {
-//         Self {
-//             sensor_id: value.id,
-//             gyro_x: value.gyro.x,
-//             gyro_y: value.gyro.y,
-//             gyro_z: value.gyro.z,
-//             accel_x: value.axel.x,
-//             accel_y: value.axel.y,
-//             accel_z: value.axel.z,
-//         }
-//     }
-// }
+// impl AnyBitPattern for Event {}
 
-/*
-    event_id
-    occurred_at
-    updated_at
-    latitude
-    longitude
-    depth_km
-    magnitude
-    mag_type
-    place
-    region
-    source
-    status
-    tsunami
-*/
+const _: () = assert!(
+    size_of::<Event>() == size_of::<u64>() + size_of::<i32>() * 6,
+    "Event structure has paddings"
+);
