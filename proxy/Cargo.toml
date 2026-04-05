@@ -1,0 +1,26 @@
+[package]
+name = "skju_proxy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+thiserror = "2.0.18"
+itertools = "0.14.0"
+dotenvy = "0.15.7"
+
+tokio = { version = "1.50.0", features = ["full"] }
+tokio-graceful = "0.2.2"
+
+rustls = "0.23.36"
+rustls-pemfile = "2.2.0"
+
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+tokio-rustls = "0.26.4"
+x509-parser = "0.18.1"
+
+#rama = { version = "0.2.0", features = ["http", "tcp", "tls", "rustls"] }
+#serde = { version = "1.0", features = ["derive"] }
+#serde_json = "1.0"

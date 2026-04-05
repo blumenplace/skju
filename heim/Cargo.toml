@@ -1,0 +1,10 @@
+[package]
+name = "skju_heim"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.50", features = [ "full" ]}
+futures = { version = "0.3.32" }
+tower = {  version = "0.5", features = [ "full" ] }
+tonic = { version = "0.14.5" }

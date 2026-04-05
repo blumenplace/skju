@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package Heim;
+
+message Empty {}
+
+message ID {
+  uint64 value = 1;
+}
+
+message Location {
+  double longitude = 1;
+  double latitude = 2;
+}
+
+message Region {
+  Location from = 1;
+  Location to = 2;
+}
+
+message Station {
+  ID id = 1;
+  string name = 2;
+  Location location = 3;
+  uint64 version = 4;
+}
+
+message StationsCountRequest {
+  optional Region region = 1;
+}
+
+message StationsCountResponse {
+  uint64 count = 1;
+}
+
+message CreateStationError {
+  enum ErrorCode {
+    Failed = 0;
+    Conflict = 1;
+    Invalid = 2;
+  }
+  ErrorCode error = 1;
+  optional Station station = 2;
+}
+
+message CreateStationResponse {
+  oneof result {
+    Empty ok = 1;
+    CreateStationError error = 2;
+  }
+}
+
+message UpdateStationError {
+  enum ErrorCode {
+    Failed = 0;
+  }
+  ErrorCode error = 1;
+}
+
+message UpdateStationResponse {
+  oneof result {
+    Empty ok = 1;
+    UpdateStationError error = 2;
+  }
+}
+
+message DeleteStationRequest {
+  ID id = 1;
+  uint64 version = 2;
+}
+
+message DeleteStationError {
+  enum ErrorCode {
+    Failed = 0;
+    NotFound = 1;
+  }
+
+  ErrorCode error = 1;
+}
+
+message DeleteStationResponse {
+  oneof result {
+    Empty ok = 1;
+    DeleteStationError error = 2;
+  }
+}
+
+message ListStationsRequest {
+  optional Region region = 1;
+}
+
+message ListStationsResponse {
+  repeated Station stations = 1;
+}
+
+message Notification {
+  enum Action {
+    ADDED = 0;
+    UPDATED = 1;
+    DELETED = 2;
+  }
+  Action action = 1;
+  Station station = 2;
+}
+
+service Heim {
+  // Returns the number of Seismic Stations either on Earth or in Specific region.
+  rpc StationsCount (StationsCountRequest) returns (StationsCountResponse) {}
+
+  rpc CreateStation (Station) returns (CreateStationResponse) {}
+  rpc UpdateStation (Station) returns (UpdateStationResponse) {}
+  rpc DeleteStation (DeleteStationRequest) returns (DeleteStationResponse) {}
+
+  rpc ListStations (ListStationsRequest) returns (ListStationsResponse) {}
+
+  rpc Notifications (Empty) returns (stream Notification) {}
+}

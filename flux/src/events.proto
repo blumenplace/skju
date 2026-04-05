@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package events;
+
+import "google/protobuf/timestamp.proto";
+
+message Event {
+    uint32 sensor_id = 1;
+
+    google.protobuf.Timestamp ts = 3;
+
+    double gyro_x = 2;
+    double gyro_y = 4;
+    double gyro_z = 5;
+
+    double accel_x = 6;
+    double accel_y = 7;
+    double accel_z = 8;
+}

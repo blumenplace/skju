@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: skju-serv-allow-https-mqtt
+  namespace: skju
+spec:
+  podSelector:
+    matchLabels:
+      app: skju-serv
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        # HTTP
+        - protocol: TCP
+          port: 80
+        # HTTPS
+        - protocol: TCP
+          port: 443
+        # MQTT (plain)
+        - protocol: TCP
+          port: 1883
+        # MQTT over TLS (MQTTS) — include if you use it
+        - protocol: TCP
+          port: 8883

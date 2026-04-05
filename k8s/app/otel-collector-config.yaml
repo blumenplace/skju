@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: skju
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 127.0.0.1:4317
+          http:
+            endpoint: 127.0.0.1:4318
+
+    processors:
+      batch: {}
+
+    exporters:
+      # Traces -> Jaeger (collector port 14268 in your compose / Service)
+      jaeger:
+        endpoint: http://jaeger:14268/api/traces
+
+      # Logs -> Seq (OTLP/HTTP). You may need to adjust the path depending on Seq version/config.
+      otlphttp/seq_logs:
+        endpoint: http://seq:5341
+        # If your Seq requires a specific OTLP path, set it here (examples):
+        # endpoint: http://seq:5341/ingest/otlp
+        # endpoint: http://seq:5341/ingest/otlp/v1/logs
+
+      # Metrics -> remote backend (Prometheus remote_write endpoint as an example)
+      prometheusremotewrite:
+        endpoint: http://REPLACE_ME_PROM_REMOTE_WRITE_ENDPOINT/api/v1/write
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [jaeger]
+
+        logs:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlphttp/seq_logs]
+
+        metrics:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [prometheusremotewrite]

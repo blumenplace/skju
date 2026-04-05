@@ -1,0 +1,16 @@
+syntax = 'proto3';
+
+import "google/protobuf/timestamp.proto";
+
+message EventValue {
+  uint16 x = 1;
+  uint16 y = 2;
+  uint16 z = 3;
+}
+
+message Value {
+  uint32 sensor_id = 1;
+  google.protobuf.Timestamp ts = 2;
+  gyro EventValue = 3;
+  accel EventValue = 4;
+}

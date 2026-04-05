@@ -1,0 +1,276 @@
+import SwiftUI
+import MapKit
+
+extension MKMapRect {
+    init(for region: MKCoordinateRegion) {
+        let topLeft = CLLocationCoordinate2D(
+            latitude: region.center.latitude + region.span.latitudeDelta / 2,
+            longitude: region.center.longitude - region.span.longitudeDelta / 2
+        )
+        let bottomRight = CLLocationCoordinate2D(
+            latitude: region.center.latitude - region.span.latitudeDelta / 2,
+            longitude: region.center.longitude + region.span.longitudeDelta / 2
+        )
+        let a = MKMapPoint(topLeft)
+        let b = MKMapPoint(bottomRight)
+        self = MKMapRect(
+            x: min(a.x, b.x),
+            y: min(a.y, b.y),
+            width: abs(a.x - b.x),
+            height: abs(a.y - b.y)
+        )
+    }
+}
+
+final class QuakeOverlay: NSObject, MKOverlay {
+    let boundingMapRect: MKMapRect
+    let coordinate: CLLocationCoordinate2D
+
+    init(region: MKCoordinateRegion) {
+        self.boundingMapRect = MKMapRect(for: region)
+        self.coordinate = region.center
+        super.init()
+    }
+}
+
+final class QuakeRenderer: MKOverlayRenderer {
+    override func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
+        // Convert a map rect to view rect
+        let rect = self.rect(for: overlay.boundingMapRect)
+
+        // Example Core Graphics drawing
+        context.setFillColor(UIColor.systemRed.withAlphaComponent(0.15).cgColor)
+        context.fill(rect)
+
+        // Draw a stroked circle at a map coordinate
+        let centerCoord = overlay.coordinate
+        let centerPoint = self.point(for: MKMapPoint(centerCoord))
+        let radius: CGFloat = 60 / zoomScale  // scale with zoom to keep visual size reasonable
+        context.setStrokeColor(UIColor.systemRed.cgColor)
+        context.setLineWidth(2 / zoomScale)
+        context.strokeEllipse(
+          in: CGRect(
+            x: centerPoint.x - radius,
+            y: centerPoint.y - radius,
+            width: radius * 2, height: radius * 2)
+        )
+    }
+}
+
+
+struct MapView: UIViewRepresentable {
+
+    @Environment(QuakeGestureState.self) var quakeGestureState
+    
+    @Binding var mapCenter: CLLocationCoordinate2D?
+
+    var sensors: [StationItem] = []
+    var selectedCoordinate: CLLocationCoordinate2D? = nil
+    var onAddAt: ((Double, Double) -> Void)? = nil
+    var onQuakeAt: ((Double, Double) -> Void)? = nil
+
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+
+        let overlay = MKTileOverlay(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
+        overlay.canReplaceMapContent = true
+        mapView.addOverlay(overlay, level: .aboveLabels)
+
+        let quakeOverlay = QuakeOverlay(region: mapView.region)
+        mapView.addOverlay(quakeOverlay, level: .aboveLabels)
+        mapView.delegate = context.coordinator
+
+        let quakeGesture = QuakeGestureRecognizer(target: context.coordinator)
+        mapView.addGestureRecognizer(quakeGesture)
+
+//        let interaction = UIContextMenuInteraction(delegate: context.coordinator)
+//        mapView.addInteraction(interaction)
+        
+        let menuTap = UILongPressGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.menuTap(_:))
+        )
+        menuTap.minimumPressDuration = 0.4
+        menuTap.numberOfTouchesRequired = 2
+        menuTap.numberOfTapsRequired = 1
+        mapView.addGestureRecognizer(menuTap)
+
+        return mapView
+    }
+
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        if let sel = selectedCoordinate {
+            let center = sel
+            let span = MKCoordinateSpan(latitudeDelta: 1.0, longitudeDelta: 1.0)
+            let region = MKCoordinateRegion(center: center, span: span)
+            uiView.setRegion(region, animated: true)
+        }
+
+        uiView.removeAnnotations(uiView.annotations)
+
+        for sensor in sensors {
+            let ann = MKPointAnnotation()
+            ann.coordinate = sensor.coordinate
+            ann.title = "Seismic Station"
+            uiView.addAnnotation(ann)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    func onQuake(x: Double, y: Double, intensity: CGFloat) {
+        print("QUAKE AT \(x), \(y) with intensity \(intensity)")
+    }
+
+    class Coordinator: NSObject, MKMapViewDelegate,
+                       // UIContextMenuInteractionDelegate,
+                       QuakeGestureRecognizerDelegate
+    {
+        var map: MapView
+
+        init(_ parent: MapView) {
+            self.map = parent
+        }
+        
+        @objc func menuTap(_ gesture: UILongPressGestureRecognizer) {
+            guard let mapView = gesture.view as? MKMapView else { return }
+
+            let location = gesture.location(in: mapView)
+            let coord = mapView.convert(location, toCoordinateFrom: mapView)
+            let x = coord.longitude
+            let y = coord.latitude
+            
+            // Create and present the menu as an alert or action sheet
+            let alert = UIAlertController(title: "Map", message: nil, preferredStyle: .actionSheet)
+            
+            alert.addAction(UIAlertAction(title: "Add New Seismic Station", style: .default) { [weak self] _ in
+                self?.map.onAddAt?(x, y)
+            })
+            
+            alert.addAction(UIAlertAction(title: "Trigger Earth Quake", style: .default) { [weak self] _ in
+                self?.map.onQuakeAt?(x, y)
+            })
+            
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            
+            // Present from the root view controller
+            if let windowScene = mapView.window?.windowScene,
+               let rootVC = windowScene.windows.first?.rootViewController {
+                // Find the topmost presented view controller
+                var topVC = rootVC
+                while let presented = topVC.presentedViewController {
+                    topVC = presented
+                }
+                
+                // For iPad, set the popover source
+                if let popover = alert.popoverPresentationController {
+                    popover.sourceView = mapView
+                    popover.sourceRect = CGRect(origin: location, size: .zero)
+                }
+                
+                topVC.present(alert, animated: true)
+            }
+        }
+        
+        
+        func onQuakeGestureUpdate(phase: UIGestureRecognizer.State, origin: CGPoint, current: CGPoint) {
+            // Map may have moved/ zoomed, need to recalculate the coordinate
+            // let coordinate = self.parent.convert(origin, toCoordinateFrom: self.parent)
+            // let coordinate = CLLocationCoordinate2D(latitude: origin.x, longitude: origin.y)
+
+            Task { @MainActor in
+                switch phase {
+                case .began:
+                    self.map.quakeGestureState.gestureActivated(at: origin)
+
+                case .changed:
+                    self.map.quakeGestureState.gestureMoved(to: current, coordinate: origin.asClLocationCoordinate2D)
+
+                case .ended:
+                    self.map.quakeGestureState.gestureFired(coordinate: origin.asClLocationCoordinate2D)
+
+                case .failed, .cancelled:
+                    self.map.quakeGestureState.gestureCancelled()
+
+                default:
+                    break
+                }
+            }
+            
+        }
+
+        @objc func handleForceDrag(_ gesture: QuakeGestureRecognizer) {
+            guard let mapView = gesture.view as? MKMapView else { return }
+            
+            // Only trigger on .ended - when the user lifts their finger
+            if gesture.state == .ended {
+                let location = gesture.location(in: mapView)
+                let coord = mapView.convert(location, toCoordinateFrom: mapView)
+                let x = coord.longitude
+                let y = coord.latitude
+
+                map.onQuake(x: x, y: y, intensity: 0)
+            }
+        }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            // Set to true if you want map gestures to work simultaneously
+            return false
+        }
+
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            let center = mapView.region.center
+            map.mapCenter = center
+        }
+
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let tileOverlay = overlay as? MKTileOverlay {
+                return MKTileOverlayRenderer(tileOverlay: tileOverlay)
+            }
+            return MKOverlayRenderer(overlay: overlay)
+        }
+
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            guard annotation is MKPointAnnotation else { return nil }
+            let identifier = "sensor-annotation"
+            let view: MKMarkerAnnotationView
+            if let dequeued = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView {
+                view = dequeued
+                view.annotation = annotation
+            } else {
+                view = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                view.canShowCallout = true
+                view.glyphImage = UIImage(systemName: "flag.fill")
+                view.markerTintColor = .systemRed
+            }
+            return view
+        }
+
+        // UIContextMenuInteractionDelegate
+        func contextMenuInteraction(
+            _ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint
+        ) -> UIContextMenuConfiguration? {
+            guard let mapView = interaction.view as? MKMapView else { return nil }
+            let coord = mapView.convert(location, toCoordinateFrom: mapView)
+            let x = coord.longitude
+            let y = coord.latitude
+
+            return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
+                let add = UIAction(title: "Add New Seismic Station", image: UIImage(systemName: "plus")) {
+                  [weak self] _ in
+                  self?.map.onAddAt?(x, y)
+                }
+                let quake = UIAction(
+                    title: "Trigger Earth Quake",
+                    image: UIImage(systemName: "waveform.path.ecg"))
+                { [weak self] _ in self?.map.onQuakeAt?(x, y) }
+                return UIMenu(title: "Map", children: [add, quake])
+            }
+        }
+    }
+}

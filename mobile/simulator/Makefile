@@ -5,7 +5,7 @@ ARCH=$(shell uname -m)
 
 SDK_PATH := $(shell xcrun --sdk iphonesimulator --show-sdk-path 2>/dev/null)
 
-SKJU_COMMON_BUILD_DIR := ../common/target/swift-build
+SKJU_COMMON_BUILD_DIR := ../common/target/SkjuCommon-build/
 SKJU_COMMON_XCFRAMEWORK := $(strip $(SKJU_COMMON_BUILD_DIR))/SkjuCommon.xcframework
 
 ifeq ($(strip $(SDK_PATH)),)
@@ -61,7 +61,7 @@ build: $(APP_NAME).app/Info.plist
 		-F $(SKJU_COMMON_XCFRAMEWORK)/ios-arm64-simulator \
 		-framework SkjuCommon \
 		-o $(APP_NAME).app/$(APP_NAME) \
-		Sources/$(APP_NAME)/Main.swift
+		src/$(APP_NAME)/Main.swift
 
 
 # Does not work: -I $(SKJU_COMMON_XCFRAMEWORK)/ios-arm64-simulator/SkjuCommon.framework/Headers \
@@ -92,7 +92,7 @@ launch:
 
 
 fmt:
-	xcrun swift-format --in-place ./Sources/$(APP_NAME)/Main.swift
+	xcrun swift-format --in-place $(wildcard src/$(APP_NAME)/*.swift)
 
 
 .PHONY: run

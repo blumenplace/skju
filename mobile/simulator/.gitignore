@@ -1,0 +1,15 @@
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+UserInterfaceState.xcuserstate
+
+build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+.swiftpm/
+.build/
+
+.DS_Store
