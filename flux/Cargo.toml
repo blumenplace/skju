@@ -30,4 +30,4 @@ prost-build = "0.14.3"
 
 [dev-dependecies]
 #tokio-netem = "0.1.1"
-rumqttc-next = "0.29.0"
+#rumqttc-next = "0.29.0"
