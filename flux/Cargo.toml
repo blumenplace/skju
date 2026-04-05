@@ -16,6 +16,7 @@ opentelemetry-instrumentation-tokio = "0.1.2"
 opentelemetry_sdk = "0.31.0"
 prost = "0.14.3"
 prost-types = "0.14.3"
+futures = "0.3"
 tower = { version = "0.5", features = ["util"] }
 tokio-util = { version = "0.7", features = ["full"] }
 serde = { workspace = true }

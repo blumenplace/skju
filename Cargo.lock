@@ -2986,6 +2986,7 @@ dependencies = [
  "bytemuck",
  "clickhouse",
  "dotenvy",
+ "futures",
  "krafka",
  "mqtt-protocol-core",
  "opentelemetry",
