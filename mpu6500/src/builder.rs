@@ -193,6 +193,7 @@ impl<T: Bus, U: Timer> MPU6500Builder<WithBus<T>, WithTimer<U>> {
         let config_register_byte = encode_config_register(&self.config, &self.fifo_config);
         let config_bytes_to_send = [CONFIG & WRITE_MASK, config_register_byte];
         let user_ctrl_config = self.user_ctrl_config.unwrap_or_default();
+        let smplrt_div_bytes_to_send = [SMPLRT_DIV & WRITE_MASK, self.sample_rate_divider];
 
         if fifo_enabled {
             user_ctrl_config.enable_fifo();
@@ -205,6 +206,7 @@ impl<T: Bus, U: Timer> MPU6500Builder<WithBus<T>, WithTimer<U>> {
             full_reset(&mut bus, &mut timer).await;
         }
 
+        bus.send(&smplrt_div_bytes_to_send).await;
         bus.send(&config_bytes_to_send).await;
         bus.send(&ctrl_config_bytes_to_send).await;
 
@@ -245,16 +247,7 @@ impl<T: Bus, U: Timer> MPU6500Builder<WithBus<T>, WithTimer<U>> {
             bus.send(&bytes_to_send).await;
         }
 
-        if self.sample_rate_divider != 0 {
-            let bytes_to_send = [SMPLRT_DIV & WRITE_MASK, self.sample_rate_divider];
-            bus.send(&bytes_to_send).await;
-        }
-
-        MPU6500 {
-            bus,
-            timer,
-            latest_interrupts: 0,
-        }
+        MPU6500 { bus, timer, latest_interrupts: 0 }
     }
 }
 
