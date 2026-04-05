@@ -13,7 +13,7 @@ mod mqtt_svc;
 mod shutdown;
 
 pub(crate) use models::*;
-use crate::mqtt_svc::MqttService;
+use crate::mqtt_svc::TcpMqttService;
 use crate::shutdown::Shutdown;
 
 static FLUX_MQTT_BIND_ADDR: &str = "FLUX_MQTT_BIND_ADDR";
@@ -84,7 +84,7 @@ async fn main() -> Result<()> {
             res = listener.accept() => {
                 let (stream, addr) = res?;
                 tracing::info!(%addr, "accepted mqtt connection");
-                let svc = MqttService::new(mqtt_topic.clone(), token.clone());
+                let svc = TcpMqttService::new(mqtt_topic.clone(), token.clone());
                 join_set.spawn(async move {
                     if let Err(e) = svc.serve(stream).await {
                         tracing::error!(%addr, error = ?e, "mqtt connection error");

@@ -21,12 +21,12 @@ pub(crate) enum SvcError {
     MalformedEventStructure(String),
 }
 
-pub(crate) struct MqttService {
+pub(crate) struct TcpMqttService {
     events_topic: String,
     shutdown: CancellationToken,
 }
 
-impl MqttService {
+impl TcpMqttService {
     pub(crate) fn new(events_topic: String, shutdown: CancellationToken) -> Self {
         Self { events_topic, shutdown }
     }
@@ -122,7 +122,7 @@ impl MqttService {
     }
 }
 
-impl tower::Service<tokio::net::TcpStream> for MqttService {
+impl tower::Service<tokio::net::TcpStream> for TcpMqttService {
     type Response = ();
     type Error = SvcError;
     type Future = std::pin::Pin<Box<dyn Future<Output = StdResult<(), SvcError>> + Send>>;
@@ -135,7 +135,7 @@ impl tower::Service<tokio::net::TcpStream> for MqttService {
         let events_topic = self.events_topic.clone();
         let shutdown = self.shutdown.clone();
         Box::pin(async move {
-            MqttService::new(events_topic, shutdown).serve(stream).await
+            TcpMqttService::new(events_topic, shutdown).serve(stream).await
         })
     }
 }
@@ -160,7 +160,7 @@ mod tests {
         let et = events_topic.to_string();
         let child_token = token.clone();
         let handle = tokio::spawn(async move {
-            let svc = MqttService::new(et, child_token);
+            let svc = TcpMqttService::new(et, child_token);
             ss.notify_one();
             svc.serve(istream).await
         });
@@ -227,7 +227,7 @@ mod tests {
 
         let child_token = token.clone();
         let handle = tokio::spawn(async move {
-            let svc = MqttService::new("test-topic".to_string(), child_token);
+            let svc = TcpMqttService::new("test-topic".to_string(), child_token);
             ss.notify_one();
             svc.serve(istream).await
         });
