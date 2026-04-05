@@ -5,6 +5,9 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1"
+thiserror = "2.0.18"
+itertools = "0.14.0"
+dotenvy = "0.15.7"
 
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-graceful = "0.2.2"
