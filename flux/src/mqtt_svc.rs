@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::result::Result as StdResult;
 use std::sync::Arc;
 use std::task::{Context as TaskContext, Poll};
@@ -11,7 +10,7 @@ use mqtt_protocol_core::mqtt::{
     common::Cursor as MqttCursor,
     packet::GenericPacket,
 };
-use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt};
 use crate::pods;
 
 
@@ -28,13 +27,12 @@ pub(crate) enum SvcError {
 pub(crate) type EventStream = BoxStream<'static, Result<GenericPacket<u16>, SvcError>>;
 
 pub(crate) struct MqttTcpService {
-    events_topic: String,
     shutdown: CancellationToken,
 }
 
 impl MqttTcpService {
-    pub(crate) fn new(events_topic: String, shutdown: CancellationToken) -> Self {
-        Self { events_topic, shutdown }
+    pub(crate) fn new(shutdown: CancellationToken) -> Self {
+        Self { shutdown }
     }
 
     pub(crate) async fn serve<Stream, S>(
@@ -50,7 +48,7 @@ impl MqttTcpService {
         let mut server = Connection::<Server>::new(Version::V5_0);
         let mut read_buf = [0u8; 8 * 1024];
         let mut inbound: Vec<u8> = Vec::with_capacity(16 * 1024);
-        let (mut read_half, mut write_half) = tokio::io::split(stream);
+        let (mut read_half, _write_half) = tokio::io::split(stream);
 
         loop {
             tokio::select! {
@@ -118,25 +116,6 @@ impl MqttTcpService {
     }
 }
 
-impl tower::Service<tokio::net::TcpStream> for MqttTcpService {
-    type Response = ();
-    type Error = SvcError;
-    type Future = std::pin::Pin<Box<dyn Future<Output = StdResult<(), SvcError>> + Send>>;
-
-    fn poll_ready(&mut self, _cx: &mut TaskContext<'_>) -> Poll<StdResult<(), SvcError>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, stream: tokio::net::TcpStream) -> Self::Future {
-        let events_topic = self.events_topic.clone();
-        let shutdown = self.shutdown.clone();
-        Box::pin(async move {
-            let event_svc = MqttEventService::new(Arc::new(events_topic.clone()));
-            let svc = MqttTcpService::new(events_topic, shutdown);
-            svc.serve(stream, event_svc).await
-        })
-    }
-}
 
 pub(crate) struct MqttEventService {
     events_topic: Arc<String>,
@@ -211,8 +190,8 @@ mod tests {
         let et = events_topic.to_string();
         let child_token = token.clone();
         let handle = tokio::spawn(async move {
-            let event_svc = MqttEventService::new(et.clone().into());
-            let svc = MqttTcpService::new(et, child_token);
+            let event_svc = MqttEventService::new(et.into());
+            let svc = MqttTcpService::new(child_token);
             ss.notify_one();
             svc.serve(istream, event_svc).await
         });
@@ -280,7 +259,7 @@ mod tests {
         let child_token = token.clone();
         let handle = tokio::spawn(async move {
             let event_svc = MqttEventService::new("test-topic".to_string().into());
-            let svc = MqttTcpService::new("test-topic".to_string(), child_token);
+            let svc = MqttTcpService::new(child_token);
             ss.notify_one();
             svc.serve(istream, event_svc).await
         });
