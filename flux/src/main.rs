@@ -85,7 +85,7 @@ async fn main() -> Result<()> {
                 let (stream, addr) = res?;
                 tracing::info!(%addr, "accepted mqtt connection");
                 let event_svc = MqttEventService::new(Arc::new(mqtt_topic.clone()));
-                let svc = MqttTcpService::new(token.clone());
+                let mut svc = MqttTcpService::new(token.clone());
                 join_set.spawn(async move {
                     if let Err(e) = svc.serve(stream, event_svc).await {
                         tracing::error!(%addr, error = ?e, "mqtt connection error");
