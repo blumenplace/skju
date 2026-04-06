@@ -1,23 +1,23 @@
-use crate::pods;
-use futures::stream::{BoxStream, StreamExt as _};
-use mqtt_protocol_core::mqtt::connection::TimerKind;
-use mqtt_protocol_core::mqtt::packet::v5_0::Disconnect;
-use mqtt_protocol_core::mqtt::result_code::DisconnectReasonCode;
-use mqtt_protocol_core::mqtt::{
-    Connection, Version,
-    common::Cursor as MqttCursor,
-    connection::{Event, GenericEvent, role::Server},
-    packet::GenericPacket,
-};
 use std::pin::Pin;
 use std::result::Result as StdResult;
 use std::sync::Arc;
 use std::task::{Context as TaskContext, Poll};
 use std::time::Duration;
+use futures::stream::{BoxStream, StreamExt as _};
+use mqtt_protocol_core::mqtt::{
+    Connection, Version,
+    common::Cursor as MqttCursor,
+    connection::{Event, TimerKind, role::Server},
+    packet::Packet,
+    packet::v5_0::Disconnect,
+    result_code::DisconnectReasonCode,
+};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::time::{Instant, Sleep};
 use tokio_util::sync::CancellationToken;
 use tower::ServiceExt as _;
+
+use crate::pods;
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SvcError {
@@ -33,7 +33,7 @@ pub(crate) enum SvcError {
     ClientRequestTimerCancel(TimerKind),
 }
 
-pub(crate) type EventStream = BoxStream<'static, Result<GenericPacket<u16>, SvcError>>;
+pub(crate) type EventStream = BoxStream<'static, Result<Packet, SvcError>>;
 
 pub(crate) struct MqttTcpService {
     shutdown: CancellationToken,
@@ -51,7 +51,7 @@ impl MqttTcpService {
     pub(crate) async fn serve<Stream, S>(&mut self, stream: Stream, mut event_svc: S) -> StdResult<(), SvcError>
     where
         Stream: AsyncRead + AsyncWrite + Unpin + Send,
-        S: tower::Service<Vec<GenericEvent<u16>>, Response = EventStream, Error = SvcError> + IsConnected + Send,
+        S: tower::Service<Vec<Event>, Response = EventStream, Error = SvcError> + IsConnected + Send,
         S::Future: Send,
     {
         let mut server = Connection::<Server>::new(Version::V5_0);
@@ -177,7 +177,7 @@ impl IsConnected for MqttEventService {
     }
 }
 
-impl tower::Service<Vec<GenericEvent<u16>>> for MqttEventService {
+impl tower::Service<Vec<Event>> for MqttEventService {
     type Response = EventStream;
     type Error = SvcError;
     type Future = std::future::Ready<StdResult<EventStream, SvcError>>;
@@ -186,7 +186,7 @@ impl tower::Service<Vec<GenericEvent<u16>>> for MqttEventService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, events: Vec<GenericEvent<u16>>) -> Self::Future {
+    fn call(&mut self, events: Vec<Event>) -> Self::Future {
         let events_topic = self.events_topic.clone();
         let result = (|| -> StdResult<EventStream, SvcError> {
             let cmds: Vec<_> = Vec::new();
@@ -196,7 +196,7 @@ impl tower::Service<Vec<GenericEvent<u16>>> for MqttEventService {
                 };
                 tracing::info!(?packet, "received mqtt packet");
                 match packet {
-                    GenericPacket::<u16>::V5_0Publish(publish) => {
+                    Packet::V5_0Publish(publish) => {
                         let topic = publish.topic_name();
                         if topic == &*events_topic {
                             let payload = publish.payload().as_slice();
