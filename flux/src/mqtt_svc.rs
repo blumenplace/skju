@@ -12,7 +12,7 @@ use mqtt_protocol_core::mqtt::{
     packet::v5_0::Disconnect,
     result_code::DisconnectReasonCode,
 };
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite}; // AsyncWriteExt
 use tokio::time::{Instant, Sleep};
 use tokio_util::sync::CancellationToken;
 use tower::ServiceExt as _;
@@ -51,7 +51,7 @@ impl MqttTcpService {
     pub(crate) async fn serve<Stream, S>(&mut self, stream: Stream, mut event_svc: S) -> StdResult<(), SvcError>
     where
         Stream: AsyncRead + AsyncWrite + Unpin + Send,
-        S: tower::Service<Vec<Event>, Response = EventStream, Error = SvcError> + IsConnected + Send,
+        S: tower::Service<Vec<Packet>, Response = EventStream, Error = SvcError> + IsConnected + Send,
         S::Future: Send,
     {
         let mut server = Connection::<Server>::new(Version::V5_0);
@@ -102,11 +102,11 @@ impl MqttTcpService {
                 },
             }
 
-            let mut app_events = Vec::new();
+            let mut received_packets = Vec::new();
             for event in events.drain(..) {
                 match event {
-                    Event::NotifyPacketReceived(_) => {
-                        app_events.push(event)
+                    Event::NotifyPacketReceived(packet) => {
+                        received_packets.push(packet)
                     },
                     Event::RequestSendPacket {
                         packet,
@@ -144,8 +144,8 @@ impl MqttTcpService {
                 }
             }
 
-            if !app_events.is_empty() {
-                let mut cmd_stream = event_svc.ready().await?.call(app_events).await?;
+            if !received_packets.is_empty() {
+                let mut cmd_stream = event_svc.ready().await?.call(received_packets).await?;
                 while let Some(cmd) = cmd_stream.next().await {
                     let packet = cmd?;
                     let _new_events = server.send(packet);
@@ -160,24 +160,24 @@ pub(crate) trait IsConnected {
     fn is_connected(&self) -> bool;
 }
 
-pub(crate) struct MqttEventService {
+pub(crate) struct MqttPacketService {
     events_topic: Arc<String>,
     is_connected: bool,
 }
 
-impl MqttEventService {
+impl MqttPacketService {
     pub(crate) fn new(events_topic: Arc<String>) -> Self {
         Self { events_topic, is_connected: false }
     }
 }
 
-impl IsConnected for MqttEventService {
+impl IsConnected for MqttPacketService {
     fn is_connected(&self) -> bool {
         self.is_connected
     }
 }
 
-impl tower::Service<Vec<Event>> for MqttEventService {
+impl tower::Service<Vec<Packet>> for MqttPacketService {
     type Response = EventStream;
     type Error = SvcError;
     type Future = std::future::Ready<StdResult<EventStream, SvcError>>;
@@ -186,14 +186,11 @@ impl tower::Service<Vec<Event>> for MqttEventService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, events: Vec<Event>) -> Self::Future {
+    fn call(&mut self, packets: Vec<Packet>) -> Self::Future {
         let events_topic = self.events_topic.clone();
         let result = (|| -> StdResult<EventStream, SvcError> {
             let cmds: Vec<_> = Vec::new();
-            for event in events {
-                let Event::NotifyPacketReceived(packet) = event else {
-                    continue;
-                };
+            for packet in packets {
                 tracing::info!(?packet, "received mqtt packet");
                 match packet {
                     Packet::V5_0Publish(publish) => {
@@ -240,7 +237,7 @@ mod tests {
         let et = events_topic.to_string();
         let child_token = token.clone();
         let handle = tokio::spawn(async move {
-            let event_svc = MqttEventService::new(et.into());
+            let event_svc = MqttPacketService::new(et.into());
             let mut svc = MqttTcpService::new(child_token);
             ss.notify_one();
             svc.serve(istream, event_svc).await
@@ -311,7 +308,7 @@ mod tests {
 
         let child_token = token.clone();
         let handle = tokio::spawn(async move {
-            let event_svc = MqttEventService::new("test-topic".to_string().into());
+            let event_svc = MqttPacketService::new("test-topic".to_string().into());
             let mut svc = MqttTcpService::new(child_token);
             ss.notify_one();
             svc.serve(istream, event_svc).await

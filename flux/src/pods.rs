@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use crate::{ReadingValue, SensorId};
-use bytemuck::{AnyBitPattern, Pod, Zeroable};
+use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, Default)]
