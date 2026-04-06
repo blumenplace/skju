@@ -51,7 +51,7 @@ impl MqttTcpService {
     pub(crate) async fn serve<Stream, S>(&mut self, stream: Stream, mut event_svc: S) -> StdResult<(), SvcError>
     where
         Stream: AsyncRead + AsyncWrite + Unpin + Send,
-        S: tower::Service<Vec<GenericEvent<u16>>, Response = EventStream, Error = SvcError> + Send,
+        S: tower::Service<Vec<GenericEvent<u16>>, Response = EventStream, Error = SvcError> + IsConnected + Send,
         S::Future: Send,
     {
         let mut server = Connection::<Server>::new(Version::V5_0);
@@ -64,10 +64,14 @@ impl MqttTcpService {
             tokio::select! {
                 _ = self.shutdown.cancelled() => {
                     tracing::info!("mqtt broker graceful shutdown");
-                    let evts = server.send(Disconnect::builder()
-                        .reason_code(DisconnectReasonCode::NormalDisconnection)
-                        .build().map_err(SvcError::MqttError)?.into());
-                    events.extend(evts);
+                    if event_svc.is_connected() {
+                        let evts = server.send(Disconnect::builder()
+                            .reason_code(DisconnectReasonCode::NormalDisconnection)
+                            .build().map_err(SvcError::MqttError)?.into());
+                        events.extend(evts);
+                    } else {
+                        return Ok(())
+                    }
                 },
                 _ = self.timer.as_mut() => {
                     tracing::trace!("PingreqRecv timer has fired");
@@ -140,8 +144,6 @@ impl MqttTcpService {
                 }
             }
 
-            /*
-
             if !app_events.is_empty() {
                 let mut cmd_stream = event_svc.ready().await?.call(app_events).await?;
                 while let Some(cmd) = cmd_stream.next().await {
@@ -150,18 +152,28 @@ impl MqttTcpService {
                     dbg!(&_new_events);
                 }
             }
-             */
         }
     }
 }
 
+trait IsConnected {
+    fn is_connected(&self) -> bool;
+}
+
 pub(crate) struct MqttEventService {
     events_topic: Arc<String>,
+    is_connected: bool,
 }
 
 impl MqttEventService {
     pub(crate) fn new(events_topic: Arc<String>) -> Self {
-        Self { events_topic }
+        Self { events_topic, is_connected: false }
+    }
+}
+
+impl IsConnected for MqttEventService {
+    fn is_connected(&self) -> bool {
+        self.is_connected
     }
 }
 
