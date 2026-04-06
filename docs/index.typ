@@ -30,6 +30,11 @@
 )
 
 
+= Skju Architecture
+
+This section discusses the high-level design for Skju's architecture.
+
+
 = Sensors and Seismic Stations Identification
 
 Reliable node identification is a foundational requirement in distributed sensor networks,
