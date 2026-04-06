@@ -1,5 +1,5 @@
 [workspace]
-members = ["skju", "skju_emulator", "skju_core", "skju_server", "mpu6500", "sn-serv", "flux", "heim"]
+members = ["skju", "skju_emulator", "skju_core", "skju_server", "mpu6500", "flux", "heim"]
 exclude = ["skju_sgw", "skju_sn", "defmt_cs", "mobile/common", "proxy"]
 resolver = "2"
 
