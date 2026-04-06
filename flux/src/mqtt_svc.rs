@@ -156,7 +156,7 @@ impl MqttTcpService {
     }
 }
 
-trait IsConnected {
+pub(crate) trait IsConnected {
     fn is_connected(&self) -> bool;
 }
 
