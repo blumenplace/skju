@@ -9,9 +9,10 @@ use mqtt_protocol_core::mqtt::{
     common::Cursor as MqttCursor,
     connection::{Event, TimerKind, role::Server},
     packet::Packet,
-    packet::v5_0::Disconnect,
-    result_code::DisconnectReasonCode,
+    packet::v5_0::{Connack, Disconnect},
+    result_code::{ConnectReasonCode, DisconnectReasonCode},
 };
+use mqtt_protocol_core::mqtt::result_code::AuthReasonCode;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite}; // AsyncWriteExt
 use tokio::time::{Instant, Sleep};
 use tokio_util::sync::CancellationToken;
@@ -162,18 +163,18 @@ pub(crate) trait IsConnected {
 
 pub(crate) struct MqttPacketService {
     events_topic: Arc<String>,
-    is_connected: bool,
+    client_id: Option<String>,
 }
 
 impl MqttPacketService {
     pub(crate) fn new(events_topic: Arc<String>) -> Self {
-        Self { events_topic, is_connected: false }
+        Self { events_topic, client_id: None }
     }
 }
 
 impl IsConnected for MqttPacketService {
     fn is_connected(&self) -> bool {
-        self.is_connected
+        self.client_id.is_some()
     }
 }
 
@@ -189,10 +190,33 @@ impl tower::Service<Vec<Packet>> for MqttPacketService {
     fn call(&mut self, packets: Vec<Packet>) -> Self::Future {
         let events_topic = self.events_topic.clone();
         let result = (|| -> StdResult<EventStream, SvcError> {
-            let cmds: Vec<_> = Vec::new();
+            let mut cmds: Vec<_> = Vec::new();
             for packet in packets {
                 tracing::info!(?packet, "received mqtt packet");
                 match packet {
+                    Packet::V5_0Connect(p) => {
+                        self.client_id = Some(p.client_id().to_string());
+
+                        let response = Connack::builder()
+                            .session_present(false)
+                            .reason_code(ConnectReasonCode::Success)
+                            .build()
+                            .map(Packet::V5_0Connack)
+                            .map_err(SvcError::MqttError)?;
+
+                        cmds.push(response);
+                    },
+                    Packet::V5_0Auth(auth) => {
+                        match auth.reason_code().unwrap() {
+                            AuthReasonCode::Success => {}
+                            AuthReasonCode::ContinueAuthentication => {}
+                            AuthReasonCode::ReAuthenticate => {}
+                        }
+                    },
+                    Packet::V5_0Subscribe(subs) => {
+                        todo!()
+                    },
+                    Packet::V5_0Unsubscribe(_) => {},
                     Packet::V5_0Publish(publish) => {
                         let topic = publish.topic_name();
                         if topic == &*events_topic {
