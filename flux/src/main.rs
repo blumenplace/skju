@@ -6,7 +6,6 @@ use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 use krafka::producer::Producer;
 
-mod pods;
 mod models;
 mod events;
 mod mqtt_svc;

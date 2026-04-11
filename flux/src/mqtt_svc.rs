@@ -18,7 +18,6 @@ use tokio::time::{Instant, Sleep};
 use tokio_util::sync::CancellationToken;
 use tower::ServiceExt as _;
 
-use crate::pods;
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SvcError {
@@ -221,7 +220,7 @@ impl tower::Service<Vec<Packet>> for MqttPacketService {
                         let topic = publish.topic_name();
                         if topic == &*events_topic {
                             let payload = publish.payload().as_slice();
-                            let pod_event: pods::Event = bytemuck::try_pod_read_unaligned(payload)
+                            let pod_event: skju_core::Event = bytemuck::try_pod_read_unaligned(payload)
                                 .map_err(|e| SvcError::MalformedEventStructure(e.to_string()))?;
                             dbg!(&pod_event);
                             // Push write-back bytes here when needed:

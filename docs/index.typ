@@ -34,6 +34,42 @@
 
 This section discusses the high-level design for Skju's architecture.
 
+= Simulation
+
+
+In seismology, attenuation describes how seismic wave amplitude
+decreases with distance from the earthquake source.
+
+Skju model them thought combination of two physical effects:
+- Geometric spreading --- surface waves, spreading in 2D along the surface
+$Alpha ~= frac(1, sqrt(r)) $
+
+- Anelastic attenuation --- surface media absorbs waves energy.
+Often (?) modelled as exponential decay on top of geometric term.
+
+$ A(r) = A₀ · frac(1, r) · exp(-π · f · r / (Q · v)) $
+
+
+A₀ — source amplitude (depends on magnitude)
+r — distance from source
+f — frequency of the wave
+Q — quality factor of the medium
+v — wave velocity
+
+
+A₀ is tied to earthquake magnitude.
+
+
+The Richter scale relationship is logarithmic:
+
+$ Alpha_(nothing) = 10^(M dot.op c)$
+
+
+
+The Richter magnitude of an earthquake is determined from the logarithm of the amplitude of waves recorded by seismographs.
+
+
+
 
 = Sensors and Seismic Stations Identification
 

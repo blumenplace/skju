@@ -25,6 +25,8 @@ tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
 thiserror = "2.0.18"
 
+skju_core = { path = "../core" }
+
 [build-dependencies]
 prost-build = "0.14.3"
 

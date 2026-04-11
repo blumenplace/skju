@@ -9,6 +9,9 @@ let package = Package(
     products: [
         .executable(name: "SkjuSimulator", targets: ["SkjuSimulator"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/adam-fowler/mqtt-nio.git", from: "2.13.0"),
+    ],
     targets: [
         .binaryTarget(
             name: "SkjuCommon",
@@ -16,7 +19,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "SkjuSimulator",
-            dependencies: ["SkjuCommon"],
+            dependencies: ["SkjuCommon", .product(name: "MQTTNIO", package: "mqtt-nio")],
             path: "src/SkjuSimulator",
             linkerSettings: [
                 .linkedFramework("UIKit"),
