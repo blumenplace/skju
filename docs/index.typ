@@ -69,6 +69,9 @@ $ Alpha_(nothing) = 10^(M dot.op c)$
 The Richter magnitude of an earthquake is determined from the logarithm of the amplitude of waves recorded by seismographs.
 
 
+M_0 = mu * U_not * S
+
+with μ being the rigidity (or resistance to moving) of a fault with a surface area of S over an average dislocation (distance) of ū. (Modern formulations replace ūS with the equivalent D̄A, known as the "geometric moment" or "potency".[39]) 
 
 
 = Sensors and Seismic Stations Identification

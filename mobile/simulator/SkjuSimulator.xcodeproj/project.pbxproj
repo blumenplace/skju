@@ -38,7 +38,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			explicitFileTypes = {
 				eventspod.cpp = sourcecode.c;
-				eventspod.h = sourcecode.cpp.h;
+				eventspod.h = sourcecode.c.h;
 			};
 			path = SkjuSimulator;
 			sourceTree = "<group>";
