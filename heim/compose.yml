@@ -1,0 +1,43 @@
+services:
+  heim:
+    build:
+      context: .
+    environment:
+      HEIM_DB_FILE: ${HEIM_DB_FILE:-/run/secrets/heim_db}
+    secrets:
+      - heim_db
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    healthcheck:
+      test: ["CMD", "/bin/grpc-health-probe", "-addr=:50051"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - db
+      - valkey
+
+  db:
+    image: postgis/postgis:18-3.5
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: heim
+    ports:
+      - "5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  cache:
+    image: valkey/valkey:8.0
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+secrets:
+  heim_db:
+    environment: "HEIM_DB"
+#    file: ./db-connection-string.txt
+#    external: true

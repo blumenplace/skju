@@ -28,3 +28,20 @@ import CoreLocation
 
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
+
+/// Event structure is defined in "eventspod.h" file.
+extension Event {
+    init(sensor_id: UInt64, date: Date) {
+        let ts = UInt64(date.timeIntervalSince1970)
+        self = Event(
+            sensor_id: sensor_id,
+            ts: ts,
+            gyro_x: 0,
+            gyro_y: 0,
+            gyro_z: 0,
+            accel_x: 0,
+            accel_y: 0,
+            accel_z: 0
+        )
+    }
+}

@@ -1,23 +1,23 @@
-use crate::pods;
-use futures::stream::{BoxStream, StreamExt as _};
-use mqtt_protocol_core::mqtt::connection::TimerKind;
-use mqtt_protocol_core::mqtt::packet::v5_0::Disconnect;
-use mqtt_protocol_core::mqtt::result_code::DisconnectReasonCode;
-use mqtt_protocol_core::mqtt::{
-    Connection, Version,
-    common::Cursor as MqttCursor,
-    connection::{Event, GenericEvent, role::Server},
-    packet::GenericPacket,
-};
 use std::pin::Pin;
 use std::result::Result as StdResult;
 use std::sync::Arc;
 use std::task::{Context as TaskContext, Poll};
 use std::time::Duration;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use futures::stream::{BoxStream, StreamExt as _};
+use mqtt_protocol_core::mqtt::{
+    Connection, Version,
+    common::Cursor as MqttCursor,
+    connection::{Event, TimerKind, role::Server},
+    packet::Packet,
+    packet::v5_0::{Connack, Disconnect},
+    result_code::{ConnectReasonCode, DisconnectReasonCode},
+};
+use mqtt_protocol_core::mqtt::result_code::AuthReasonCode;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite}; // AsyncWriteExt
 use tokio::time::{Instant, Sleep};
 use tokio_util::sync::CancellationToken;
 use tower::ServiceExt as _;
+
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SvcError {
@@ -33,7 +33,7 @@ pub(crate) enum SvcError {
     ClientRequestTimerCancel(TimerKind),
 }
 
-pub(crate) type EventStream = BoxStream<'static, Result<GenericPacket<u16>, SvcError>>;
+pub(crate) type EventStream = BoxStream<'static, Result<Packet, SvcError>>;
 
 pub(crate) struct MqttTcpService {
     shutdown: CancellationToken,
@@ -51,7 +51,7 @@ impl MqttTcpService {
     pub(crate) async fn serve<Stream, S>(&mut self, stream: Stream, mut event_svc: S) -> StdResult<(), SvcError>
     where
         Stream: AsyncRead + AsyncWrite + Unpin + Send,
-        S: tower::Service<Vec<GenericEvent<u16>>, Response = EventStream, Error = SvcError> + IsConnected + Send,
+        S: tower::Service<Vec<Packet>, Response = EventStream, Error = SvcError> + IsConnected + Send,
         S::Future: Send,
     {
         let mut server = Connection::<Server>::new(Version::V5_0);
@@ -102,11 +102,11 @@ impl MqttTcpService {
                 },
             }
 
-            let mut app_events = Vec::new();
+            let mut received_packets = Vec::new();
             for event in events.drain(..) {
                 match event {
-                    Event::NotifyPacketReceived(_) => {
-                        app_events.push(event)
+                    Event::NotifyPacketReceived(packet) => {
+                        received_packets.push(packet)
                     },
                     Event::RequestSendPacket {
                         packet,
@@ -144,8 +144,8 @@ impl MqttTcpService {
                 }
             }
 
-            if !app_events.is_empty() {
-                let mut cmd_stream = event_svc.ready().await?.call(app_events).await?;
+            if !received_packets.is_empty() {
+                let mut cmd_stream = event_svc.ready().await?.call(received_packets).await?;
                 while let Some(cmd) = cmd_stream.next().await {
                     let packet = cmd?;
                     let _new_events = server.send(packet);
@@ -160,24 +160,24 @@ pub(crate) trait IsConnected {
     fn is_connected(&self) -> bool;
 }
 
-pub(crate) struct MqttEventService {
+pub(crate) struct MqttPacketService {
     events_topic: Arc<String>,
-    is_connected: bool,
+    client_id: Option<String>,
 }
 
-impl MqttEventService {
+impl MqttPacketService {
     pub(crate) fn new(events_topic: Arc<String>) -> Self {
-        Self { events_topic, is_connected: false }
+        Self { events_topic, client_id: None }
     }
 }
 
-impl IsConnected for MqttEventService {
+impl IsConnected for MqttPacketService {
     fn is_connected(&self) -> bool {
-        self.is_connected
+        self.client_id.is_some()
     }
 }
 
-impl tower::Service<Vec<GenericEvent<u16>>> for MqttEventService {
+impl tower::Service<Vec<Packet>> for MqttPacketService {
     type Response = EventStream;
     type Error = SvcError;
     type Future = std::future::Ready<StdResult<EventStream, SvcError>>;
@@ -186,21 +186,41 @@ impl tower::Service<Vec<GenericEvent<u16>>> for MqttEventService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, events: Vec<GenericEvent<u16>>) -> Self::Future {
+    fn call(&mut self, packets: Vec<Packet>) -> Self::Future {
         let events_topic = self.events_topic.clone();
         let result = (|| -> StdResult<EventStream, SvcError> {
-            let cmds: Vec<_> = Vec::new();
-            for event in events {
-                let Event::NotifyPacketReceived(packet) = event else {
-                    continue;
-                };
+            let mut cmds: Vec<_> = Vec::new();
+            for packet in packets {
                 tracing::info!(?packet, "received mqtt packet");
                 match packet {
-                    GenericPacket::<u16>::V5_0Publish(publish) => {
+                    Packet::V5_0Connect(p) => {
+                        self.client_id = Some(p.client_id().to_string());
+
+                        let response = Connack::builder()
+                            .session_present(false)
+                            .reason_code(ConnectReasonCode::Success)
+                            .build()
+                            .map(Packet::V5_0Connack)
+                            .map_err(SvcError::MqttError)?;
+
+                        cmds.push(response);
+                    },
+                    Packet::V5_0Auth(auth) => {
+                        match auth.reason_code().unwrap() {
+                            AuthReasonCode::Success => {}
+                            AuthReasonCode::ContinueAuthentication => {}
+                            AuthReasonCode::ReAuthenticate => {}
+                        }
+                    },
+                    Packet::V5_0Subscribe(subs) => {
+                        todo!()
+                    },
+                    Packet::V5_0Unsubscribe(_) => {},
+                    Packet::V5_0Publish(publish) => {
                         let topic = publish.topic_name();
                         if topic == &*events_topic {
                             let payload = publish.payload().as_slice();
-                            let pod_event: pods::Event = bytemuck::try_pod_read_unaligned(payload)
+                            let pod_event: skju_core::Event = bytemuck::try_pod_read_unaligned(payload)
                                 .map_err(|e| SvcError::MalformedEventStructure(e.to_string()))?;
                             dbg!(&pod_event);
                             // Push write-back bytes here when needed:
@@ -240,7 +260,7 @@ mod tests {
         let et = events_topic.to_string();
         let child_token = token.clone();
         let handle = tokio::spawn(async move {
-            let event_svc = MqttEventService::new(et.into());
+            let event_svc = MqttPacketService::new(et.into());
             let mut svc = MqttTcpService::new(child_token);
             ss.notify_one();
             svc.serve(istream, event_svc).await
@@ -311,7 +331,7 @@ mod tests {
 
         let child_token = token.clone();
         let handle = tokio::spawn(async move {
-            let event_svc = MqttEventService::new("test-topic".to_string().into());
+            let event_svc = MqttPacketService::new("test-topic".to_string().into());
             let mut svc = MqttTcpService::new(child_token);
             ss.notify_one();
             svc.serve(istream, event_svc).await

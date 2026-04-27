@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-skju_core = { path = "../skju_core" }
+skju_core = { path = "../core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }

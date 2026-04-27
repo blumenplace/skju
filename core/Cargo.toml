@@ -5,3 +5,7 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
+bytemuck = "1.25.0"
+
+[build-dependencies]
+cbindgen = "0.29.2"

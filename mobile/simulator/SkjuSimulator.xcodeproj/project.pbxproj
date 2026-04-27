@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4DDEC18B2F8901AC002CD8BB /* MQTTNIO in Frameworks */ = {isa = PBXBuildFile; productRef = 4D2706772F7E51BB00DC0335 /* MQTTNIO */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4DE511672F73C6E0004858C6 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -32,6 +36,10 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4DE5115B2F73C6DE004858C6 /* SkjuSimulator */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+				eventspod.cpp = sourcecode.c;
+				eventspod.h = sourcecode.c.h;
+			};
 			path = SkjuSimulator;
 			sourceTree = "<group>";
 		};
@@ -52,6 +60,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4DDEC18B2F8901AC002CD8BB /* MQTTNIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +121,7 @@
 			);
 			name = SkjuSimulator;
 			packageProductDependencies = (
+				4D2706772F7E51BB00DC0335 /* MQTTNIO */,
 			);
 			productName = SkjuSimulator;
 			productReference = 4DE511592F73C6DE004858C6 /* SkjuSimulator.app */;
@@ -175,6 +185,7 @@
 				TargetAttributes = {
 					4DE511582F73C6DE004858C6 = {
 						CreatedOnToolsVersion = 26.3;
+						LastSwiftMigration = 2640;
 					};
 					4DE511652F73C6E0004858C6 = {
 						CreatedOnToolsVersion = 26.3;
@@ -198,6 +209,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				4D2706752F7E51BB00DC0335 /* XCRemoteSwiftPackageReference "grpc-swift" */,
+				4D2706762F7E51BB00DC0335 /* XCRemoteSwiftPackageReference "mqtt-nio" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4DE5115A2F73C6DE004858C6 /* Products */;
@@ -399,6 +411,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -424,6 +437,8 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "SkjuSimulator/SkjuSimulator-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 2;
@@ -435,6 +450,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -460,6 +476,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "SkjuSimulator/SkjuSimulator-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 2;
@@ -596,7 +613,23 @@
 				minimumVersion = 2.2.3;
 			};
 		};
+		4D2706762F7E51BB00DC0335 /* XCRemoteSwiftPackageReference "mqtt-nio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/adam-fowler/mqtt-nio.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.13.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4D2706772F7E51BB00DC0335 /* MQTTNIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4D2706762F7E51BB00DC0335 /* XCRemoteSwiftPackageReference "mqtt-nio" */;
+			productName = MQTTNIO;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4DE511512F73C6DE004858C6 /* Project object */;
 }
